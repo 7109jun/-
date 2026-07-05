@@ -1,0 +1,261 @@
+# 로블록스(Roblox) Luau 기반 분산 동기화 및 고급 게임 아키텍처 가이드
+
+본 문서는 로블록스 스튜디오(Roblox Studio) 환경에서 엔터프라이즈급 아키텍처를 설계하고, **클라이언트-서버 동기화(Network Replication), 데이터 영속성(Data Persistence), 분산 락(Distributed Lock) 기법, 외부 소스코드 제어 시스템(Git/GitHub)과의 통합 워크플로우**를 논문 및 화이트페이퍼 수준으로 정립한 고급 엔지니어링 가이드입니다.
+
+---
+
+## 📋 목차
+1. **서론: 로블록스 분산 네트워크 컴퓨팅 모델의 이해**
+   - 1.1 서버-클라이언트 복제 모델 (Client-Server Replication)
+   - 1.2 네트워크 오너십 (Network Ownership) 및 물리 시뮬레이션
+   - 1.3 하이브리드 인터프리터 Luau의 런타임 최적화
+2. **클라이언트-서버 네트워크 동기화의 정석**
+   - 2.1 RemoteEvent와 RemoteFunction의 바인딩 원리 및 백엔드 큐잉
+   - 2.2 대역폭(Bandwidth) 최적화와 데이터 압축(Serialization) 기술
+   - 2.3 지연 시간 보상(Lag Compensation) 및 클라이언트 측 예측(Client-side Prediction)
+3. **온라인 데이터 영속화 및 글로벌 동기화 (DataStores & MemoryStores)**
+   - 3.1 DataStoreService 아키텍처와 분산 합의
+   - 3.2 세션 잠금(Session Locking): 레이스 컨디션 및 중복 로그인 방지 패턴
+   - 3.3 MemoryStoreService를 활용한 초고속 글로벌 데이터 실시간 동기화
+4. **모던 로블록스 실무 개발 워크플로우: Git & GitHub 통합**
+   - 4.1 Rojo(로호) 아키텍처: 로컬 파일 시스템과 인스턴스 트리 동기화
+   - 4.2 GitHub Actions를 활용한 자동 CI/CD 및 인프라 프로비저닝 (Wally 패키지 관리)
+5. **실전 프로덕션 아키텍처 소스코드 및 상세 해설**
+   - 5.1 원자적 연산과 세션 잠금이 구현된 프레임워크 수준의 DataStore 모듈
+   - 5.2 부드러운 위치 동기화를 위한 보간(Interpolation) 시스템 내부 구조
+
+---
+
+## 1. 서론: 로블록스 분산 네트워크 컴퓨팅 모델의 이해
+
+### 1.1 서버-클라이언트 복제 모델 (Client-Server Replication)
+로블록스는 권한 있는 서버(Authoritative Server) 기동형 분산 구조를 채택하고 있습니다. 모든 상태(State)의 진실의 원천(Source of Truth)은 서버 메모리에 존재합니다.
+* **복제 방향성:** `Workspace`, `ReplicatedStorage` 등 특정 컨테이너 하위의 인스턴스 변경사항은 **서버 ➡️ 클라이언트** 방향으로 단방향 자동 복제(Replication)됩니다.
+* **필터링 활성화(FilteringEnabled):** 클라이언트에서의 변경사항(물리적 오너십이 없는 개체)은 절대 서버로 복제되지 않아, 메모리 변조(Exploit)로부터 서버 상태를 방지합니다.
+
+### 1.2 네트워크 오너십 (Network Ownership)
+움직이는 파트(BasePart)의 물리 연산(Physics Simulation) 부하를 분산하기 위해 로블록스는 **네트워크 오너십** 개념을 사용합니다.
+* 캐릭터와 인접한 물리 객체는 클라이언트가 연산 주도권을 위임받아 계산한 뒤, 결과 궤적을 서버로 역복제합니다.
+* 이를 잘못 제어하면 텔레포트 핵이나 가속 핵에 취약해지므로, 서버 기반 검증 로직이 동반되어야 합니다.
+
+---
+
+## 2. 클라이언트-서버 네트워크 동기화의 정석
+
+### 2.1 RemoteEvent와 RemoteFunction의 내부 메커니즘
+원격 프로시저 호출(RPC)의 일종으로, Luau 런타임은 패킷 유실을 방지하기 위해 UDP 프로토콜 기반의 자체적인 신뢰성 보장 레이어를 사용합니다.
+
+[Client] --- (RemoteEvent:FireServer) ---> [Network Queue] ---> [Server Event Listener]
+[Server] --- (RemoteFunction:InvokeClient) -> [Yielding Thread] -> [Client Return] -> [Server Resume]
+
+
+* **주의(Warning):** `RemoteFunction:InvokeClient`는 클라이언트가 무한 루프에 빠지거나 연결을 끊으면 서버 스레드가 영구히 정지(Yield/Hang)되는 치명적인 취약점을 가집니다. 따라서 프로덕션 아키텍처에서는 **오직 `RemoteEvent`를 양방향으로 교차 활용하는 패턴**만을 정석으로 취급합니다.
+
+### 2.2 대역폭 최적화 패턴 (Bit Packing & Serialization)
+로블록스는 초당 전송량 제한(인스턴스당 약 50KB/s 내외 권장)이 엄격합니다. Vector3, CFrame 등의 거대한 원시 객체를 그대로 전송하는 대신 문자열이나 비트 플래그로 직렬화(Serialization)해야 합니다.
+
+```lua
+-- 데이터 압축 및 직렬화 예시 모듈
+local CompressionService = {}
+
+function CompressionService.SerializeVector3(vector: Vector3): string
+    -- 소수점 아래 2자리까지 고정하여 16진수 문자열로 포맷팅 (패킷 크기 최적화)
+    return string.format("%.2f,%.2f,%.2f", vector.X, vector.Y, vector.Z)
+end
+
+function CompressionService.DeserializeVector3(serialized: string): Vector3
+    local x, y, z = string.match(serialized, "([^,]+),([^,]+),([^,]+)")
+    return Vector3.new(tonumber(x), tonumber(y), tonumber(z))
+end
+
+return CompressionService
+3. 온라인 데이터 영속화 및 글로벌 동기화 (DataStores & MemoryStores)
+3.1 DataStoreService 아키텍처와 분산 합의
+로블록스의 DataStoreService는 AWS DynamoDB 기반의 분산 NoSQL 데이터베이스 구조를 띄고 있습니다. 이로 인해 강한 일관성(Strong Consistency)을 확보하기 위해 내부적인 쓰기 제한(초당 플레이어당 6회 등)의 요청 속도 제한(Throttling)을 가집니다.
+
+3.2 세션 잠금(Session Locking) 구현 패턴
+여러 게임 서버(서버 인스턴스)가 동시에 한 유저의 글로벌 데이터에 접근하여 덮어쓰는 레이스 컨디션을 방지하기 위해, 데이터 로드 시 해당 데이터를 요청한 서버의 JobId와 TimeStamp를 마킹하는 세션 잠금(Session Locking) 메커니즘이 필수적입니다.
+
+[서버 A: 유저 진입] -> DataStore 읽기 -> 세션 값에 JobId_A 기록 (Locking)
+[유저가 순간이동하여 서버 B 진입] -> DataStore 읽기 시도 -> 이미 JobId_A로 잠겨있음 감지 -> 대기 및 재시도 루프 실행
+[서버 A: 유저 퇴장] -> 세션 해제(Unlock) 및 최종 데이터 저장 -> [서버 B] 잠금 해제 감지 후 안전하게 로드
+3.3 MemoryStoreService를 활용한 초고속 실시간 동기화
+경매장, 매치메이킹, 전 서버 실시간 채팅 등 1초 미만의 지연 시간 내에 전 세계 모든 게임 서버 인스턴스 간 데이터를 동기화해야 할 때는 Redis 기반의 고성능 인메모리 저장소인 MemoryStoreService (Sorted Map, Queue 구조 제공)를 활용합니다.
+
+4. 모던 로블록스 실무 개발 워크플로우: Git & GitHub 통합
+기존의 로블록스 스튜디오 내에서 마우스 우클릭으로 스크립트를 생성하는 방식은 협업과 소스코드 버전 관리가 불가능합니다. 현대의 탑티어 로블록스 스튜디오 팀들은 웹 개발과 동일한 인프라를 구축합니다.
+
+4.1 Rojo(로호) 아키텍처
+Rojo는 로컬 파일 시스템(src/ 폴더 내의 .lua 또는 .luau 파일)을 로블록스 스튜디오 내의 오브젝트 트리(ReplicatedStorage, ServerScriptService 등)와 실시간 웹소켓 통신을 통해 1:1로 미러링 동기화해 주는 오픈소스 툴입니다.
+
+프로젝트 설정 파일 예시 (default.project.json)
+
+JSON
+{
+  "name": "ProductionGame",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    }
+  }
+}
+4.2 Wally 패키지 매니저 및 GitHub CI/CD 빌드 파이프라인
+Wally: Luau 진형의 NPM 또는 Cargo와 같은 패키지 관리자입니다. 외부 오픈소스 라이브러리(예: Knit, Fusion)를 모듈 단위로 버전을 고정하여 안전하게 관리합니다.
+
+GitHub Actions: 코드가 main 브랜치에 push 되거나 Pull Request가 승인되면 자동으로 Rojo build 명령어를 수행하여 .rbxl(로블록스 바이너리 파일) 파일로 패파일링하고, OpenCloud API를 통해 서버에 무중단 자동 홀 배포(CD) 프로세스를 수립할 수 있습니다.
+
+5. 실전 프로덕션 아키텍처 소스코드 및 상세 해설
+5.1 고성능 원자적 연산 및 세션 잠금이 구현된 DataStore 모듈
+이 모듈은 데이터의 원자성(Atomicity)을 보장하기 위해 UpdateAsync 메서드를 사용하며, 외부 유효성 검증(Validation) 단계를 내포합니다.
+
+Lua
+--!strict
+local DataStoreService = game:GetService("DataStoreService")
+local HttpService = game:GetService("HttpService")
+
+local PlayerDataStore = DataStoreService:GetDataStore("Production_Data_v1")
+local SESSION_TIMEOUT = 1200 -- 20분 후 세션 만료로 간주
+
+local DatabaseManager = {}
+
+type SessionData = {
+	Value: any,
+	LockOwner: string,
+	LastUpdated: number,
+}
+
+-- [서버 전용] 유저 데이터 로드 및 세션 잠금 처리
+function DatabaseManager.LoadDataWithSessionLock(playerKey: string, currentJobId: string): any
+	local retries = 5
+	local backoff = 2
+	
+	while retries > 0 do
+		local success, result = pcall(function()
+			return PlayerDataStore:UpdateAsync(playerKey, function(oldData: any)
+				local session: SessionData = oldData or {
+					Value = {},
+					LockOwner = "",
+					LastUpdated = os.time()
+				}
+				
+				-- 타 서버에 의해 세션이 잠겨있는지 판별
+				if session.LockOwner ~= "" and session.LockOwner ~= currentJobId then
+					if os.time() - session.LastUpdated < SESSION_TIMEOUT then
+						-- 아직 유효한 잠금 상태라면 에러를 던져 UpdateAsync 취소 및 재시도 유도
+						error("Data is currently locked by another session: " .. session.LockOwner)
+					end
+				end
+				
+				-- 현재 서버가 잠금 권한 획득
+				session.LockOwner = currentJobId
+				session.LastUpdated = os.time()
+				return session
+			end)
+		end)
+		
+		if success and result then
+			return result.Value
+		else
+			retries -= 1
+			warn("세션 잠금 획득 실패. 재시도 대기 중... 남은 횟수: " .. retries)
+			task.wait(backoff)
+			backoff *= 2 -- 지수 백오프 알고리즘 적용
+		end
+	end
+	
+	return nil -- 데이터 로드 실패 시 안전을 위해 nil 반환 후 예외처리 레이어로 전달
+end
+
+-- [서버 전용] 데이터 저장 및 세션 잠금 해제 (유저 퇴장 시 호출)
+function DatabaseManager.ReleaseSessionAndSave(playerKey: string, newData: any, currentJobId: string): boolean
+	local success, _ = pcall(function()
+		PlayerDataStore:UpdateAsync(playerKey, function(oldData: any)
+			if not oldData then return nil end
+			
+			-- 현재 스레드의 잠금 소유권 최종 검증
+			if oldData.LockOwner == currentJobId then
+				oldData.Value = newData
+				oldData.LockOwner = "" -- 잠금 해제
+				oldData.LastUpdated = os.time()
+			end
+			return oldData
+		end)
+	end)
+	return success
+end
+
+return DatabaseManager
+5.2 클라이언트 측 선형 보간(Linear Interpolation, Lerp) 동기화 모듈
+네트워크 패킷은 전송 주기가 일정하지 않아 뚝뚝 끊겨 보입니다. 서버에서 받아온 트랜스폼(CFrame) 버퍼를 선형 보간하여 초당 60프레임 이상으로 매끄럽게 렌더링하는 기법입니다.
+
+Lua
+--!strict
+-- 클라이언트 스크립트 (StarterPlayerScripts 내 배치 권장)
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local PositionBuffer = {}
+local INTERPOLATION_DELAY = 0.1 -- 100ms 버퍼 지연을 통한 네트워크 지터(Jitter) 흡수
+
+type NetworkTransform = {
+	Position: Vector3,
+	TimeStamp: number
+}
+
+-- 서버로부터 네트워크 패킷 수신 이벤트 바인딩 가정
+local EntityUpdateEvent = ReplicatedStorage:WaitForChild("EntityUpdateEvent") :: RemoteEvent
+
+EntityUpdateEvent.OnClientEvent:Connect(function(entityId: string, position: Vector3, serverTime: number)
+	if not PositionBuffer[entityId] then
+		PositionBuffer[entityId] = {}
+	end
+	table.insert(PositionBuffer[entityId], {
+		Position = position,
+		TimeStamp = serverTime
+	})
+	
+	-- 메모리 관리를 위해 과거 20개 이상의 유래 패킷은 제거
+	if #PositionBuffer[entityId] > 20 then
+		table.remove(PositionBuffer[entityId], 1)
+	end
+end)
+
+-- 매 프레임마다 프레임 버퍼를 읽어 부드러운 위치로 보정 렌더링 (RenderStepped)
+RunService.RenderStepped:Connect(function(deltaTime: number)
+	local renderTime = workspace:GetServerTimeNow() - INTERPOLATION_DELAY
+	
+	for entityId, buffer in pairs(PositionBuffer) do
+		local targetEntity = workspace:FindFirstChild(entityId) :: BasePart
+		if not targetEntity then continue end
+		
+		-- 렌더 타임라인에 접하는 전/후 두 패킷 탐색
+		local leftPacket: NetworkTransform? = nil
+		local rightPacket: NetworkTransform? = nil
+		
+		for i = 1, #buffer - 1 do
+			if buffer[i].TimeStamp <= renderTime and buffer[i+1].TimeStamp >= renderTime then
+				leftPacket = buffer[i]
+				rightPacket = buffer[i+1]
+				break
+			end
+		end
+		
+		if leftPacket and rightPacket then
+			-- 두 프레임 데이터 간의 가중치(Alpha) 계산
+			local totalDuration = rightPacket.TimeStamp - leftPacket.TimeStamp
+			local elapsed = renderTime - leftPacket.TimeStamp
+			local alpha = math.clamp(elapsed / totalDuration, 0, 1)
+			
+			-- 벡터 선형 보간 적용 (Lerp)
+			targetEntity.Position = leftPacket.Position:Lerp(rightPacket.Position, alpha)
+		end
+	end
+end)
