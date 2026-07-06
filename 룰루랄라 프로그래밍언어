@@ -1,0 +1,1120 @@
+룰루랄라는룰 프로그래밍 언어 만들고 있스무니다
+룰루랄라는룰 프로그래밍이 Lathe 프로젝트를 가로챌 가능성이 있어보입니다
+근데 개발하기 귀찮습니다 먼저 소스코드 공개부터 가겠스무니다 
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lullang IDE v4.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cascadia+Code:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#1e1e1e; --bg-2:#181818; --panel:#252526; --panel-2:#2d2d30; --border:#3c3c3c;
+  --text:#d4d4d4; --text-dim:#9d9d9d; --text-faint:#6a6a6a;
+  --accent:#4da3ff; --accent-dim:#2f6db3; --ok:#5fd097; --warn:#e8b84b; --danger:#f2585a;
+  --font-ui:'Inter',-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'Cascadia Code','Consolas','Courier New',monospace;
+  --radius:10px;
+  --shadow: 0 4px 16px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;}
+body{
+  background:var(--bg-2); color:var(--text); font-family:var(--font-ui);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+::-webkit-scrollbar{width:9px;height:9px;}
+::-webkit-scrollbar-thumb{background:#4a4a4d;border-radius:8px;}
+::-webkit-scrollbar-thumb:hover{background:#5a5a5e;}
+
+#ideTopBar{
+  padding:10px 18px; display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid var(--border); background:var(--bg); flex-wrap:wrap; gap:10px;
+}
+#ideTopBar h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.01em;}
+#ideTopBar h1 .accent{color:var(--accent);}
+#ideTopBar h1 .dim{color:var(--text-dim);font-weight:500;}
+.top-status{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);display:flex;gap:14px;}
+.top-status b{color:var(--accent);}
+
+#ideGrid{
+  flex:1; display:grid; min-height:0;
+  grid-template-columns: 1fr 1.5fr 250px;
+  grid-template-rows: 1fr 1fr;
+  grid-template-areas:
+    "game    editor    explorer"
+    "objects analyzer  explorer";
+  gap:10px; padding:10px;
+}
+.ide-panel{
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow); display:flex; flex-direction:column; min-height:0; overflow:hidden;
+}
+.ide-panel .ph{
+  padding:9px 14px; border-bottom:1px solid var(--border); background:var(--panel-2);
+  font-size:11.5px; font-weight:700; letter-spacing:.03em; color:var(--text-dim);
+  display:flex; align-items:center; justify-content:space-between; text-transform:uppercase;
+}
+.ide-panel .ph .ph-badge{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);text-transform:none;letter-spacing:0;}
+
+/* ---- Game Screen (top-left) ---- */
+#gameScreenPanel{grid-area:game;}
+#gameCanvasWrap{flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#000;min-height:0;}
+#lullangCanvas{border-radius:6px;image-rendering:pixelated;max-width:100%;max-height:100%;background:#0b0b0d;}
+#fpsBadge{
+  position:absolute;top:8px;right:10px;font-family:var(--font-mono);font-size:11px;
+  background:rgba(0,0,0,.55);border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--ok);
+}
+
+/* ---- Code Editor (top-middle) ---- */
+#codeEditorPanel{grid-area:editor;}
+.editor-scroll-outer{flex:1;display:flex;min-height:0;position:relative;background:var(--bg);}
+#lineGutter{
+  width:44px;flex-shrink:0;background:var(--bg);color:var(--text-faint);font-family:var(--font-mono);
+  font-size:12.5px;line-height:1.6;text-align:right;padding:10px 8px 10px 0;user-select:none;overflow:hidden;
+}
+.code-scroll{flex:1;position:relative;min-width:0;}
+#codeHighlight, #codeEditorInput{
+  position:absolute;inset:0;margin:0;padding:10px 12px;font-family:var(--font-mono);font-size:12.5px;
+  line-height:1.6;white-space:pre;overflow:auto;tab-size:2;
+}
+#codeHighlight{color:var(--text);pointer-events:none;z-index:1;}
+#codeEditorInput{
+  color:transparent;background:transparent;caret-color:#fff;border:none;outline:none;resize:none;z-index:2;
+}
+.tok-keyword{color:#c586c0;font-weight:600;}
+.tok-type{color:#4ec9b0;}
+.tok-number{color:#b5cea8;}
+.tok-string{color:#ce9178;}
+.tok-color{color:#d7ba7d;}
+.tok-comment{color:#6a9955;font-style:italic;}
+
+/* ---- Explorer (right, full height) ---- */
+#explorerPanel{grid-area:explorer;}
+#explorerList{flex:1;overflow-y:auto;padding:8px;}
+.file-item{
+  display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:6px;cursor:pointer;
+  font-family:var(--font-mono);font-size:12px;color:var(--text-dim);margin-bottom:2px;
+}
+.file-item:hover{background:var(--panel-2);}
+.file-item.active{background:var(--accent-dim);color:#fff;}
+.file-item .file-icon{color:var(--accent);}
+#explorerFoot{padding:8px;border-top:1px solid var(--border);}
+#newFileBtn{
+  width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text-dim);
+  font-size:11px;padding:7px;border-radius:7px;cursor:pointer;font-family:var(--font-ui);
+}
+#newFileBtn:hover{color:var(--text);border-color:var(--accent-dim);}
+
+/* ---- Object Manager (bottom-left) ---- */
+#objectManagerPanel2{grid-area:objects;}
+.run-controls{display:flex;gap:6px;padding:10px;border-bottom:1px solid var(--border);}
+.run-controls button{
+  flex:1;font-family:var(--font-ui);font-size:11.5px;font-weight:700;padding:8px 6px;
+  border-radius:7px;border:1px solid var(--border);cursor:pointer;
+}
+#runBtn2{background:linear-gradient(180deg,#5cb0ff,var(--accent));color:#07223f;border:none;}
+#runBtn2:hover{filter:brightness(1.08);}
+#stopBtn2{background:var(--panel-2);color:var(--text-dim);}
+#stopBtn2:hover{color:#fff;border-color:var(--danger);}
+#restartBtn2{background:var(--panel-2);color:var(--text-dim);}
+#restartBtn2:hover{color:#fff;border-color:var(--warn);}
+#objectListBody{flex:1;overflow-y:auto;padding:6px 10px;font-family:var(--font-mono);font-size:11px;}
+.obj-row{display:flex;justify-content:space-between;gap:6px;padding:5px 6px;border-radius:6px;margin-bottom:3px;background:var(--panel-2);}
+.obj-row .obj-id{color:var(--accent);font-weight:600;}
+.obj-row .obj-type{color:var(--text-faint);}
+.obj-empty{color:var(--text-faint);text-align:center;margin-top:16px;font-size:11px;}
+
+/* ---- Code Analyzer (bottom-middle) ---- */
+#analyzerPanel{grid-area:analyzer;}
+.analyzer-tabs{display:flex;gap:3px;padding:6px 8px 0;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.analyzer-tab{
+  font-family:var(--font-ui);font-size:11px;font-weight:600;color:var(--text-dim);
+  padding:6px 12px;border-radius:6px 6px 0 0;cursor:pointer;background:transparent;border:none;
+}
+.analyzer-tab.active{background:var(--panel);color:var(--accent);}
+.analyzer-body{flex:1;overflow-y:auto;padding:10px 12px;font-family:var(--font-mono);font-size:11px;}
+.an-view{display:none;}
+.an-view.active{display:block;}
+.an-empty{color:var(--text-faint);}
+.problem-row{border-left:3px solid var(--danger);padding:6px 8px;margin-bottom:6px;background:var(--panel-2);border-radius:0 6px 6px 0;}
+.problem-row.warning{border-left-color:var(--warn);}
+.problem-row .p-head{color:var(--text);font-weight:700;}
+.problem-row .p-suggest{color:var(--text-dim);margin-top:2px;}
+.console-row{padding:3px 0;color:var(--text-dim);border-bottom:1px dashed var(--border);}
+.console-row.err{color:var(--danger);}
+.console-row.info{color:var(--ok);}
+#astView, #tokenView{white-space:pre-wrap;word-break:break-word;color:var(--text-dim);}
+</style>
+</head>
+<body>
+
+<div id="ideTopBar">
+  <h1>Lullang <span class="accent">IDE</span> <span class="dim">v4.0</span></h1>
+  <div class="top-status">
+    <span>File: <b id="topActiveFile">main.lul</b></span>
+    <span>Status: <b id="topRunStatus">idle</b></span>
+  </div>
+</div>
+
+<div id="ideGrid">
+  <section id="gameScreenPanel" class="ide-panel">
+    <div class="ph"><span>Game Screen</span><span class="ph-badge">Camera + Render</span></div>
+    <div id="gameCanvasWrap">
+      <canvas id="lullangCanvas" width="420" height="320"></canvas>
+      <div id="fpsBadge">-- FPS</div>
+    </div>
+  </section>
+
+  <section id="codeEditorPanel" class="ide-panel">
+    <div class="ph"><span>Code Editor</span><span class="ph-badge" id="editorFileBadge">main.lul</span></div>
+    <div class="editor-scroll-outer">
+      <div id="lineGutter">1</div>
+      <div class="code-scroll">
+        <pre id="codeHighlight"></pre>
+        <textarea id="codeEditorInput" spellcheck="false"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <aside id="explorerPanel" class="ide-panel">
+    <div class="ph"><span>Explorer</span><span class="ph-badge" id="fileCountBadge">0 files</span></div>
+    <div id="explorerList"></div>
+    <div id="explorerFoot"><button id="newFileBtn">+ New File</button></div>
+  </aside>
+
+  <section id="objectManagerPanel2" class="ide-panel">
+    <div class="ph"><span>Objects</span><span class="ph-badge" id="objCountBadge">0</span></div>
+    <div class="run-controls">
+      <button id="runBtn2">▶ RUN</button>
+      <button id="stopBtn2">■ STOP</button>
+      <button id="restartBtn2">⟳ RESTART</button>
+    </div>
+    <div id="objectListBody"><div class="obj-empty">RUN을 눌러 실행하세요.</div></div>
+  </section>
+
+  <section id="analyzerPanel" class="ide-panel">
+    <div class="ph"><span>Code Analyzer</span><span class="ph-badge" id="problemCountBadge">0 problems</span></div>
+    <div class="analyzer-tabs">
+      <button class="analyzer-tab active" data-tab="console">Console</button>
+      <button class="analyzer-tab" data-tab="tokens">Tokenizer</button>
+      <button class="analyzer-tab" data-tab="ast">Parser / AST</button>
+      <button class="analyzer-tab" data-tab="problems">Problems</button>
+    </div>
+    <div class="analyzer-body">
+      <div class="an-view active" id="view-console"><div class="an-empty">콘솔 출력이 여기에 표시됩니다.</div></div>
+      <div class="an-view" id="view-tokens"><div id="tokenView" class="an-empty">RUN 이후 토큰 목록이 표시됩니다.</div></div>
+      <div class="an-view" id="view-ast"><div id="astView" class="an-empty">RUN 이후 AST가 표시됩니다.</div></div>
+      <div class="an-view" id="view-problems"><div class="an-empty" id="problemsEmpty">오류/경고 없음</div></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* =========================================================================
+   0. ERROR SYSTEM
+   ========================================================================= */
+class LullangError extends Error {
+  constructor(type, message, line, suggestion) {
+    super(message);
+    this.errType = type; this.line = line !== undefined ? line : '?'; this.suggestion = suggestion || '문법과 들여쓰기를 확인하세요.';
+  }
+}
+const problems = [];
+function pushProblem(severity, type, message, line, suggestion) {
+  problems.push({ severity, type, message, line: line !== undefined ? line : '?', suggestion: suggestion || '문법과 들여쓰기를 확인하세요.' });
+  renderProblems();
+}
+function clearProblems() { problems.length = 0; renderProblems(); }
+
+const consoleLines = [];
+function consoleLog(kind, text) {
+  consoleLines.push({ kind, text, t: new Date().toLocaleTimeString() });
+  if (consoleLines.length > 300) consoleLines.shift();
+  renderConsole();
+}
+
+/* =========================================================================
+   1. RAM
+   ========================================================================= */
+const RAM_SIZE = 256;
+const RAM = new Array(RAM_SIZE).fill(0);
+
+/* =========================================================================
+   2. TOKENIZER (expressions)
+   ========================================================================= */
+class LullangTokenizer {
+  constructor(src) { this.src = src; }
+  isDigit(c) { return c >= '0' && c <= '9'; }
+  isIdentStart(c) { return /[A-Za-z_가-힣]/.test(c); }
+  isIdentPart(c) { return /[A-Za-z0-9_가-힣]/.test(c); }
+  tokenize() {
+    const s = this.src;
+    let i = 0;
+    const tokens = [];
+    while (i < s.length) {
+      const c = s[i];
+      if (c === ' ' || c === '\t') { i++; continue; }
+      if (this.isDigit(c) || (c === '.' && this.isDigit(s[i + 1]))) {
+        let j = i; while (j < s.length && (this.isDigit(s[j]) || s[j] === '.')) j++;
+        tokens.push({ type: 'NUMBER', value: parseFloat(s.slice(i, j)) });
+        i = j; continue;
+      }
+      if (this.isIdentStart(c)) {
+        let j = i; while (j < s.length && this.isIdentPart(s[j])) j++;
+        tokens.push({ type: 'IDENT', value: s.slice(i, j) });
+        i = j; continue;
+      }
+      if (c === '#') {
+        let j = i + 1; while (j < s.length && /[0-9a-fA-F]/.test(s[j])) j++;
+        tokens.push({ type: 'STRING', value: s.slice(i, j) });
+        i = j; continue;
+      }
+      if (c === '"') {
+        let j = i + 1; while (j < s.length && s[j] !== '"') j++;
+        tokens.push({ type: 'STRING', value: s.slice(i + 1, j) });
+        i = j + 1; continue;
+      }
+      const two = s.slice(i, i + 2);
+      if (['==', '!=', '>=', '<=', '&&', '||'].includes(two)) { tokens.push({ type: 'OP', value: two }); i += 2; continue; }
+      if ('+-*/%()[]!<>,{}='.includes(c)) { tokens.push({ type: 'OP', value: c }); i++; continue; }
+      i++;
+    }
+    tokens.push({ type: 'EOF', value: null });
+    return tokens;
+  }
+}
+
+/* =========================================================================
+   3. EXPRESSION PARSER -> AST  (recursive descent, no eval/new Function)
+   ========================================================================= */
+class LullangExprParser {
+  constructor(tokens) { this.tokens = tokens; this.pos = 0; }
+  peek() { return this.tokens[this.pos]; }
+  next() { return this.tokens[this.pos++]; }
+  expect(value) {
+    const t = this.next();
+    if (t.value !== value) throw new LullangError('SYNTAX', '"' + value + '" 를 예상했지만 "' + t.value + '" 를 발견함', 0, '식 문법을 확인하세요: ' + value + ' 위치');
+    return t;
+  }
+  parseExpression() { return this.parseLogicOr(); }
+  parseLogicOr() { let n = this.parseLogicAnd(); while (this.peek().value === '||') { this.next(); n = { type: 'logic', op: '||', left: n, right: this.parseLogicAnd() }; } return n; }
+  parseLogicAnd() { let n = this.parseEquality(); while (this.peek().value === '&&') { this.next(); n = { type: 'logic', op: '&&', left: n, right: this.parseEquality() }; } return n; }
+  parseEquality() { let n = this.parseComparison(); while (['==', '!='].includes(this.peek().value)) { const op = this.next().value; n = { type: 'binop', op, left: n, right: this.parseComparison() }; } return n; }
+  parseComparison() { let n = this.parseAdditive(); while (['>', '<', '>=', '<='].includes(this.peek().value)) { const op = this.next().value; n = { type: 'binop', op, left: n, right: this.parseAdditive() }; } return n; }
+  parseAdditive() { let n = this.parseMultiplicative(); while (['+', '-'].includes(this.peek().value)) { const op = this.next().value; n = { type: 'binop', op, left: n, right: this.parseMultiplicative() }; } return n; }
+  parseMultiplicative() { let n = this.parseUnary(); while (['*', '/', '%'].includes(this.peek().value)) { const op = this.next().value; n = { type: 'binop', op, left: n, right: this.parseUnary() }; } return n; }
+  parseUnary() { if (this.peek().value === '!' || this.peek().value === '-') { const op = this.next().value; return { type: 'unop', op, expr: this.parseUnary() }; } return this.parsePrimary(); }
+  parsePrimary() {
+    const t = this.peek();
+    if (t.type === 'NUMBER') { this.next(); return { type: 'num', value: t.value }; }
+    if (t.value === '(') { this.next(); const e = this.parseExpression(); this.expect(')'); return e; }
+    if (t.type === 'IDENT' && t.value === 'RAM') { this.next(); this.expect('['); const idx = this.parseExpression(); this.expect(']'); return { type: 'ram', index: idx }; }
+    if (t.type === 'IDENT' && t.value === 'ISCOLLIDE') { this.next(); this.expect('('); const a = this.parseExpression(); this.expect(','); const b = this.parseExpression(); this.expect(')'); return { type: 'iscollide', a, b }; }
+    if (t.type === 'IDENT') { this.next(); return { type: 'ident', name: t.value }; }
+    if (t.type === 'STRING') { this.next(); return { type: 'str', value: t.value }; }
+    throw new LullangError('SYNTAX', '예상치 못한 토큰 "' + t.value + '"', 0, '식(expression) 문법을 확인하세요');
+  }
+}
+function parseLullangExpression(src) {
+  const tokens = new LullangTokenizer(src).tokenize();
+  return new LullangExprParser(tokens).parseExpression();
+}
+
+/* =========================================================================
+   4. OBJECT MANAGER
+   ========================================================================= */
+class LullangObjectManagerClass {
+  constructor() { this.objects = new Map(); }
+  createOrUpdate(id, type, x, y, w, h, color) {
+    if (this.objects.has(id)) {
+      const o = this.objects.get(id);
+      o.type = type; o.x = x; o.y = y; o.width = w; o.height = h; o.size = Math.max(w, h);
+      if (color) o.color = color;
+      return o;
+    }
+    const o = {
+      id, type, x, y, width: w, height: h, size: Math.max(w, h), color: color || '#4da3ff',
+      visible: true, sprite: null, layer: 0, angle: 0, scale: 1, active: true, _fromTile: false
+    };
+    this.objects.set(id, o);
+    return o;
+  }
+  setProperty(id, prop, value) {
+    const o = this.objects.get(id);
+    if (!o) { pushProblem('warning', 'RUNTIME', '존재하지 않는 오브젝트에 SET 시도: ' + id, '?', 'OBJECT 문으로 먼저 생성하세요.'); return false; }
+    const key = prop.toLowerCase();
+    if (key === 'x') o.x = value; else if (key === 'y') o.y = value;
+    else if (key === 'width') o.width = value; else if (key === 'height') o.height = value;
+    else if (key === 'size') { o.size = value; o.width = value; o.height = value; }
+    else if (key === 'color') o.color = value; else if (key === 'visible') o.visible = !!value;
+    else if (key === 'sprite') o.sprite = value; else if (key === 'layer') o.layer = value;
+    else if (key === 'angle') o.angle = value; else if (key === 'scale') o.scale = value;
+    else if (key === 'active') o.active = !!value;
+    else { pushProblem('warning', 'RUNTIME', '알 수 없는 프로퍼티: ' + prop, '?', 'X/Y/WIDTH/HEIGHT/SIZE/COLOR/VISIBLE/SPRITE/LAYER/ANGLE/SCALE/ACTIVE 중 하나를 사용하세요.'); return false; }
+    return true;
+  }
+  get(id) { return this.objects.get(id) || null; }
+  getAllByType(type) { return [...this.objects.values()].filter(o => o.type === type); }
+  all() { return [...this.objects.values()]; }
+  clearAll() { this.objects.clear(); }
+}
+const LullangObjectManager = new LullangObjectManagerClass();
+
+/* =========================================================================
+   5. SPRITE MANAGER
+   ========================================================================= */
+const LULLANG_PALETTE = { '.': null, '0': '#000000', '1': '#ffffff', '2': '#f2585a', '3': '#5fd097', '4': '#4da3ff', '5': '#e8b84b', '6': '#c586c0', '7': '#f2884b' };
+class LullangSpriteManagerClass {
+  constructor() { this.sprites = new Map(); }
+  register(name, rows) { this.sprites.set(name, rows); }
+  get(name) { return this.sprites.get(name) || null; }
+  count() { return this.sprites.size; }
+  draw(ctx, name, x, y, cellSize) {
+    const rows = this.get(name);
+    if (!rows) return false;
+    const cs = cellSize || 4;
+    for (let ry = 0; ry < rows.length; ry++) {
+      const row = rows[ry];
+      for (let rx = 0; rx < row.length; rx++) {
+        const color = LULLANG_PALETTE[row[rx]];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(x + rx * cs, y + ry * cs, cs, cs);
+      }
+    }
+    return true;
+  }
+}
+const LullangSpriteManager = new LullangSpriteManagerClass();
+
+/* =========================================================================
+   6. TILE MANAGER
+   ========================================================================= */
+class LullangTileManagerClass {
+  constructor() { this.rows = []; this.tileSize = 20; }
+  loadMap(rows) {
+    LullangObjectManager.all().filter(o => o._fromTile).forEach(o => LullangObjectManager.objects.delete(o.id));
+    this.rows = rows;
+    for (let ry = 0; ry < rows.length; ry++) {
+      const row = rows[ry];
+      for (let rx = 0; rx < row.length; rx++) {
+        const ch = row[rx];
+        const px = rx * this.tileSize, py = ry * this.tileSize;
+        if (ch === '#') {
+          const o = LullangObjectManager.createOrUpdate('tile_wall_' + rx + '_' + ry, 'WALL', px, py, this.tileSize, this.tileSize, '#3c3c3c');
+          o._fromTile = true;
+        } else if (ch === 'P') {
+          LullangObjectManager.createOrUpdate('player', 'PLAYER', px, py, this.tileSize - 2, this.tileSize - 2, '#5fd097');
+        }
+      }
+    }
+  }
+  tileCountSolid() { return this.rows.join('').split('').filter(c => c === '#').length; }
+  render(ctx, camera) {
+    for (let ry = 0; ry < this.rows.length; ry++) {
+      const row = this.rows[ry];
+      for (let rx = 0; rx < row.length; rx++) {
+        if (row[rx] !== '#') continue;
+        ctx.fillStyle = '#2d2d30';
+        ctx.fillRect(rx * this.tileSize - camera.x, ry * this.tileSize - camera.y, this.tileSize, this.tileSize);
+      }
+    }
+  }
+}
+const LullangTileManager = new LullangTileManagerClass();
+
+/* =========================================================================
+   7. COLLISION MANAGER
+   ========================================================================= */
+class LullangCollisionManagerClass {
+  aabbOverlap(a, b) { return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y; }
+  isCollidingById(idA, idB) {
+    const a = LullangObjectManager.get(idA), b = LullangObjectManager.get(idB);
+    if (!a || !b || !a.active || !b.active) return false;
+    return this.aabbOverlap(a, b);
+  }
+  anyCollidingByType(typeA, typeB) {
+    const as = LullangObjectManager.getAllByType(typeA), bs = LullangObjectManager.getAllByType(typeB);
+    for (const a of as) for (const b of bs) { if (a === b) continue; if (a.active && b.active && this.aabbOverlap(a, b)) return true; }
+    return false;
+  }
+}
+const LullangCollision = new LullangCollisionManagerClass();
+
+/* =========================================================================
+   8. CAMERA
+   ========================================================================= */
+class LullangCameraClass {
+  constructor() { this.x = 0; this.y = 0; this.zoom = 1; this.followId = null; }
+  follow(id) { this.followId = id; }
+  update(canvasW, canvasH) {
+    if (this.followId) {
+      const o = LullangObjectManager.get(this.followId);
+      if (o) { this.x = o.x - canvasW / (2 * this.zoom); this.y = o.y - canvasH / (2 * this.zoom); }
+    }
+  }
+}
+const LullangCamera = new LullangCameraClass();
+
+/* =========================================================================
+   9. INPUT MANAGER
+   ========================================================================= */
+class LullangInputManagerClass {
+  constructor() {
+    this.keys = new Set(); this.mouseX = 0; this.mouseY = 0; this.mouseDown = false;
+    window.addEventListener('keydown', e => { this.keys.add(e.key.toLowerCase()); });
+    window.addEventListener('keyup', e => this.keys.delete(e.key.toLowerCase()));
+  }
+  bindCanvas(canvas) {
+    canvas.addEventListener('mousemove', e => { const r = canvas.getBoundingClientRect(); this.mouseX = e.clientX - r.left; this.mouseY = e.clientY - r.top; });
+    canvas.addEventListener('mousedown', () => this.mouseDown = true);
+    canvas.addEventListener('mouseup', () => this.mouseDown = false);
+  }
+  syncToRam() {
+    RAM[240] = this.keys.has('w') ? 1 : 0;
+    RAM[241] = this.keys.has('a') ? 1 : 0;
+    RAM[242] = this.keys.has('s') ? 1 : 0;
+    RAM[243] = this.keys.has('d') ? 1 : 0;
+    RAM[244] = this.keys.has('arrowup') ? 1 : 0;
+    RAM[245] = this.keys.has('arrowdown') ? 1 : 0;
+    RAM[246] = this.keys.has('arrowleft') ? 1 : 0;
+    RAM[247] = this.keys.has('arrowright') ? 1 : 0;
+    RAM[248] = this.mouseDown ? 1 : 0;
+    RAM[249] = Math.round(this.mouseX);
+    RAM[250] = Math.round(this.mouseY);
+  }
+  pressedKeysList() { return [...this.keys].join(', ') || '(none)'; }
+}
+const LullangInput = new LullangInputManagerClass();
+
+/* =========================================================================
+   10. RENDERER
+   ========================================================================= */
+class LullangRendererClass {
+  constructor(canvas) { this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.textQueue = []; }
+  clear() { this.textQueue = []; this.ctx.fillStyle = '#0b0b0d'; this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height); }
+  pushText(x, y, text) { this.textQueue.push({ x, y, text }); }
+  flush() {
+    LullangTileManager.render(this.ctx, LullangCamera);
+    const objs = LullangObjectManager.all().filter(o => o.visible && o.active).sort((a, b) => (a.layer - b.layer) || (a.y - b.y));
+    objs.forEach(o => this.drawObject(o));
+    this.textQueue.forEach(cmd => {
+      this.ctx.fillStyle = '#d4d4d4';
+      this.ctx.font = '11px monospace';
+      this.ctx.fillText(cmd.text, cmd.x - LullangCamera.x, cmd.y - LullangCamera.y);
+    });
+  }
+  drawObject(o) {
+    const ctx = this.ctx;
+    const sx = o.x - LullangCamera.x, sy = o.y - LullangCamera.y;
+    ctx.save();
+    ctx.translate(sx + o.width / 2, sy + o.height / 2);
+    ctx.rotate((o.angle || 0) * Math.PI / 180);
+    ctx.scale(o.scale || 1, o.scale || 1);
+    if (o.sprite && LullangSpriteManager.get(o.sprite)) {
+      LullangSpriteManager.draw(ctx, o.sprite, -o.width / 2, -o.height / 2, Math.max(2, Math.floor(o.width / 6)));
+    } else {
+      ctx.fillStyle = o.color;
+      ctx.fillRect(-o.width / 2, -o.height / 2, o.width, o.height);
+    }
+    ctx.restore();
+  }
+}
+
+/* =========================================================================
+   11. STATEMENT PARSER (line-based, brace-aware) -> program AST
+   ========================================================================= */
+class LullangStatementParser {
+  constructor(sourceText) { this.lines = sourceText.replace(/\r\n/g, '\n').split('\n'); this.idx = 0; }
+  peekLine() { return this.idx < this.lines.length ? this.lines[this.idx] : null; }
+  nextLine() { return this.lines[this.idx++]; }
+
+  parseProgram() {
+    const stmts = [];
+    while (this.idx < this.lines.length) {
+      const raw = this.peekLine();
+      if (raw === null) break;
+      const trimmed = raw.trim();
+      if (trimmed === '' || trimmed.startsWith('//')) { this.idx++; continue; }
+      if (trimmed.startsWith('}')) break;
+      stmts.push(this.parseStatement());
+    }
+    return stmts;
+  }
+
+  parseBlock() {
+    const body = this.parseProgram();
+    if (this.idx >= this.lines.length) throw new LullangError('SYNTAX', '블록이 "}" 로 닫히지 않았습니다.', this.idx + 1, '중괄호 짝을 맞춰주세요.');
+    const trimmed = this.lines[this.idx].trim();
+    if (!trimmed.startsWith('}')) throw new LullangError('SYNTAX', '블록이 "}" 로 닫히지 않았습니다.', this.idx + 1, '중괄호 짝을 맞춰주세요.');
+    const remainder = trimmed.slice(1).trim();
+    if (remainder.length > 0) this.lines[this.idx] = remainder;
+    else this.idx++;
+    return body;
+  }
+
+  parseIfHeader(line, lineNo) {
+    const m = line.match(/^룰랄\s+(.+)\s*\{$/);
+    if (!m) throw new LullangError('SYNTAX', '룰랄 <조건> { 형식이 필요합니다.', lineNo, '예: 룰랄 RAM[0] == 0 {');
+    const condExpr = parseLullangExpression(m[1]);
+    const thenBody = this.parseBlock();
+    let elseBody = null;
+    const after = this.peekLine();
+    if (after !== null && after.trim().startsWith('아니면')) {
+      const elseLineNo = this.idx + 1;
+      const elseLine = this.nextLine().trim();
+      if (elseLine === '아니면 {') elseBody = this.parseBlock();
+      else if (elseLine.startsWith('아니면 룰랄')) elseBody = [this.parseIfHeader(elseLine.replace(/^아니면\s+/, ''), elseLineNo)];
+      else throw new LullangError('SYNTAX', '"아니면" 또는 "아니면 룰랄" 형식이 필요합니다.', elseLineNo, '예: } 아니면 { 또는 } 아니면 룰랄 조건 {');
+    }
+    return { type: 'if', condExpr, thenBody, elseBody, line: lineNo };
+  }
+
+  parseStatement() {
+    const lineNo = this.idx + 1;
+    const raw = this.nextLine();
+    const line = raw.trim();
+
+    if (line === 'MAP') {
+      const rows = [];
+      while (this.peekLine() !== null && this.peekLine().trim() !== 'ENDMAP') rows.push(this.nextLine());
+      if (this.peekLine() === null) throw new LullangError('SYNTAX', 'MAP 블록이 ENDMAP으로 닫히지 않았습니다.', lineNo, 'ENDMAP을 추가하세요.');
+      this.nextLine();
+      return { type: 'map', rows, line: lineNo };
+    }
+    if (line === 'CLEAR') return { type: 'clear', line: lineNo };
+    if (line === 'RENDER') return { type: 'render', line: lineNo };
+    if (line.startsWith('TEXT ')) {
+      const m = line.match(/^TEXT\s+(\S+)\s+(\S+)\s+"(.*)"$/);
+      if (!m) throw new LullangError('SYNTAX', 'TEXT 문법 오류', lineNo, 'TEXT x y "문자열" 형태여야 합니다.');
+      return { type: 'text', xExpr: parseLullangExpression(m[1]), yExpr: parseLullangExpression(m[2]), text: m[3], line: lineNo };
+    }
+    if (line.startsWith('WALL ')) {
+      const parts = line.split(/\s+/).slice(1);
+      if (parts.length < 4) throw new LullangError('SYNTAX', 'WALL x y w h 형식이 필요합니다.', lineNo, 'WALL 10 10 20 20');
+      return { type: 'wall', xExpr: parseLullangExpression(parts[0]), yExpr: parseLullangExpression(parts[1]), wExpr: parseLullangExpression(parts[2]), hExpr: parseLullangExpression(parts[3]), line: lineNo };
+    }
+    if (line.startsWith('OBJECT ')) {
+      const parts = line.split(/\s+/).slice(1);
+      if (parts.length < 6) throw new LullangError('SYNTAX', 'OBJECT id TYPE x y w h [color] 형식이 필요합니다.', lineNo, '예: OBJECT 1 PLAYER 10 10 20 20 #4da3ff');
+      return { type: 'object', id: parts[0], objType: parts[1], xExpr: parseLullangExpression(parts[2]), yExpr: parseLullangExpression(parts[3]), wExpr: parseLullangExpression(parts[4]), hExpr: parseLullangExpression(parts[5]), color: parts[6] || null, line: lineNo };
+    }
+    if (line.startsWith('SET ')) {
+      const rest = line.slice(4).trim();
+      const ramMatch = rest.match(/^RAM\[(.+?)\]\s*=?\s*(.+)$/);
+      if (ramMatch) return { type: 'set_ram', indexExpr: parseLullangExpression(ramMatch[1]), valueExpr: parseLullangExpression(ramMatch[2]), line: lineNo };
+      const parts = rest.split(/\s+/);
+      const id = parts[0], prop = parts[1], rawValue = parts.slice(2).join(' ');
+      const numericProps = ['X', 'Y', 'WIDTH', 'HEIGHT', 'SIZE', 'ANGLE', 'SCALE', 'VISIBLE', 'ACTIVE', 'LAYER'];
+      if (numericProps.includes((prop || '').toUpperCase())) return { type: 'set_prop', id, prop, valueExpr: parseLullangExpression(rawValue), rawValue: null, line: lineNo };
+      return { type: 'set_prop', id, prop, valueExpr: null, rawValue, line: lineNo };
+    }
+    if (line.startsWith('CAMERA ')) {
+      const parts = line.split(/\s+/).slice(1);
+      if (parts[0] === 'FOLLOW') return { type: 'camera_follow', id: parts[1], line: lineNo };
+      if (parts[0] === 'X') return { type: 'camera_axis', axis: 'X', valueExpr: parseLullangExpression(parts[1]), line: lineNo };
+      if (parts[0] === 'Y') return { type: 'camera_axis', axis: 'Y', valueExpr: parseLullangExpression(parts[1]), line: lineNo };
+      if (parts[0] === 'ZOOM') return { type: 'camera_zoom', valueExpr: parseLullangExpression(parts[1]), line: lineNo };
+      throw new LullangError('SYNTAX', '알 수 없는 CAMERA 명령: ' + parts[0], lineNo, 'FOLLOW/X/Y/ZOOM 중 하나를 사용하세요.');
+    }
+    if (line.startsWith('TOUCH ')) {
+      const m = line.match(/^TOUCH\s+(\S+)\s+(\S+)\s*\{$/);
+      if (!m) throw new LullangError('SYNTAX', 'TOUCH typeA typeB { 형식이 필요합니다.', lineNo, '예: TOUCH PLAYER ENEMY {');
+      const body = this.parseBlock();
+      return { type: 'touch', typeA: m[1], typeB: m[2], body, line: lineNo };
+    }
+    if (line.startsWith('룰랄 ')) return this.parseIfHeader(line, lineNo);
+    if (line.startsWith('루루 FUNCTION ')) {
+      const name = line.slice('루루 FUNCTION '.length).trim();
+      const body = this.parseProgram();
+      const endLine = this.nextLine();
+      if (!endLine || endLine.trim() !== '루루 END') throw new LullangError('SYNTAX', '함수가 "루루 END" 로 닫히지 않았습니다.', lineNo, '함수 끝에 루루 END를 추가하세요.');
+      return { type: 'func_def', name, body, line: lineNo };
+    }
+    if (line.startsWith('루루 CALL ')) return { type: 'func_call', name: line.slice('루루 CALL '.length).trim(), line: lineNo };
+    if (line.startsWith('루루 SPRITE ')) {
+      const name = line.slice('루루 SPRITE '.length).replace(/\{$/, '').trim();
+      const rows = [];
+      while (this.peekLine() !== null && this.peekLine().trim() !== '}') rows.push(this.nextLine());
+      if (this.peekLine() === null) throw new LullangError('SYNTAX', 'SPRITE 블록이 "}" 로 닫히지 않았습니다.', lineNo, '스프라이트 끝에 }를 추가하세요.');
+      this.nextLine();
+      return { type: 'sprite_def', name, rows, line: lineNo };
+    }
+    throw new LullangError('SYNTAX', '알 수 없는 명령: "' + line + '"', lineNo, '지원되는 명령어(SET/OBJECT/WALL/CLEAR/RENDER/TEXT/룰랄/루루/TOUCH/CAMERA/MAP)를 확인하세요.');
+  }
+}
+
+/* =========================================================================
+   12. INTERPRETER / VM
+   ========================================================================= */
+function evaluateLullangExpr(node) {
+  switch (node.type) {
+    case 'num': return node.value;
+    case 'str': return node.value;
+    case 'ident': return 0;
+    case 'ram': return RAM[Math.max(0, Math.min(RAM_SIZE - 1, Math.floor(evaluateLullangExpr(node.index))))];
+    case 'iscollide': return LullangCollision.isCollidingById(evaluateLullangExpr(node.a), evaluateLullangExpr(node.b)) ? 1 : 0;
+    case 'unop': { const v = evaluateLullangExpr(node.expr); if (node.op === '!') return v ? 0 : 1; if (node.op === '-') return -v; break; }
+    case 'logic': { const l = evaluateLullangExpr(node.left); if (node.op === '&&') return (l && evaluateLullangExpr(node.right)) ? 1 : 0; if (node.op === '||') return (l || evaluateLullangExpr(node.right)) ? 1 : 0; break; }
+    case 'binop': {
+      const l = evaluateLullangExpr(node.left), r = evaluateLullangExpr(node.right);
+      switch (node.op) {
+        case '+': return l + r; case '-': return l - r; case '*': return l * r;
+        case '/': return r === 0 ? 0 : l / r; case '%': return r === 0 ? 0 : l % r;
+        case '>': return l > r ? 1 : 0; case '<': return l < r ? 1 : 0;
+        case '>=': return l >= r ? 1 : 0; case '<=': return l <= r ? 1 : 0;
+        case '==': return l === r ? 1 : 0; case '!=': return l !== r ? 1 : 0;
+      }
+      break;
+    }
+  }
+  return 0;
+}
+
+class LullangInterpreterClass {
+  constructor() { this.functions = new Map(); this.mainBody = []; }
+  compile(sourceText) {
+    this.functions.clear(); this.mainBody = [];
+    const program = new LullangStatementParser(sourceText).parseProgram();
+    program.forEach(stmt => {
+      if (stmt.type === 'func_def') { this.functions.set(stmt.name, stmt.body); }
+      else if (stmt.type === 'sprite_def') { LullangSpriteManager.register(stmt.name, stmt.rows); this.mainBody.push(stmt); }
+      else if (stmt.type === 'map') { LullangTileManager.loadMap(stmt.rows); this.mainBody.push(stmt); }
+      else this.mainBody.push(stmt);
+    });
+    this.checkWarnings(program);
+    return program;
+  }
+  checkWarnings(program) {
+    const calledNames = new Set();
+    const collectCalls = (list) => list.forEach(s => {
+      if (s.type === 'func_call') calledNames.add(s.name);
+      if (s.thenBody) collectCalls(s.thenBody);
+      if (s.elseBody) collectCalls(s.elseBody);
+      if (s.body) collectCalls(s.body);
+    });
+    collectCalls(program);
+    this.functions.forEach((body, name) => {
+      if (!calledNames.has(name)) pushProblem('warning', 'UNUSED', '함수 "' + name + '" 가 정의되었지만 호출되지 않습니다.', '?', '루루 CALL ' + name + ' 을 추가하거나 불필요하면 제거하세요.');
+    });
+  }
+  execStatements(list) { list.forEach(stmt => this.execStatement(stmt)); }
+  execStatement(stmt) {
+    switch (stmt.type) {
+      case 'clear': LullangRenderer.clear(); return;
+      case 'render': LullangRenderer.flush(); return;
+      case 'text': LullangRenderer.pushText(evaluateLullangExpr(stmt.xExpr), evaluateLullangExpr(stmt.yExpr), stmt.text); return;
+      case 'wall': {
+        const x = evaluateLullangExpr(stmt.xExpr), y = evaluateLullangExpr(stmt.yExpr), w = evaluateLullangExpr(stmt.wExpr), h = evaluateLullangExpr(stmt.hExpr);
+        LullangObjectManager.createOrUpdate('wall_' + Math.round(x) + '_' + Math.round(y), 'WALL', x, y, w, h, '#3c3c3c');
+        return;
+      }
+      case 'object': {
+        const x = evaluateLullangExpr(stmt.xExpr), y = evaluateLullangExpr(stmt.yExpr), w = evaluateLullangExpr(stmt.wExpr), h = evaluateLullangExpr(stmt.hExpr);
+        const existed = LullangObjectManager.get(stmt.id);
+        LullangObjectManager.createOrUpdate(stmt.id, stmt.objType, x, y, w, h, stmt.color);
+        if (!existed) consoleLog('info', 'OBJECT 생성: ' + stmt.id + ' (' + stmt.objType + ')');
+        return;
+      }
+      case 'set_ram': {
+        const idx = Math.max(0, Math.min(RAM_SIZE - 1, Math.floor(evaluateLullangExpr(stmt.indexExpr))));
+        RAM[idx] = evaluateLullangExpr(stmt.valueExpr);
+        return;
+      }
+      case 'set_prop': {
+        const value = stmt.valueExpr !== null ? evaluateLullangExpr(stmt.valueExpr) : stmt.rawValue;
+        LullangObjectManager.setProperty(stmt.id, stmt.prop, value);
+        return;
+      }
+      case 'if': {
+        const cond = evaluateLullangExpr(stmt.condExpr);
+        if (cond) this.execStatements(stmt.thenBody);
+        else if (stmt.elseBody) this.execStatements(stmt.elseBody);
+        return;
+      }
+      case 'touch': {
+        if (LullangCollision.anyCollidingByType(stmt.typeA, stmt.typeB)) this.execStatements(stmt.body);
+        return;
+      }
+      case 'func_call': {
+        const body = this.functions.get(stmt.name);
+        if (!body) { pushProblem('error', 'RUNTIME', '정의되지 않은 함수 호출: ' + stmt.name, stmt.line, '루루 FUNCTION ' + stmt.name + ' 을 먼저 정의하세요.'); return; }
+        this.execStatements(body);
+        return;
+      }
+      case 'camera_follow': LullangCamera.follow(stmt.id); return;
+      case 'camera_axis': if (stmt.axis === 'X') LullangCamera.x = evaluateLullangExpr(stmt.valueExpr); else LullangCamera.y = evaluateLullangExpr(stmt.valueExpr); return;
+      case 'camera_zoom': LullangCamera.zoom = Math.max(0.1, evaluateLullangExpr(stmt.valueExpr)); return;
+      case 'func_def': case 'sprite_def': case 'map': return;
+      default: return;
+    }
+  }
+  runFrame() { this.execStatements(this.mainBody); }
+}
+const LullangInterpreter = new LullangInterpreterClass();
+
+/* =========================================================================
+   13. VIRTUAL FILE SYSTEM + EXPLORER
+   ========================================================================= */
+const LULLANG_DEFAULT_MAIN = [
+  'MAP',
+  '####################',
+  '#..................#',
+  '#..#............#..#',
+  '#..#....P.......#..#',
+  '#..#............#..#',
+  '#..................#',
+  '####################',
+  'ENDMAP',
+  '',
+  '루루 SPRITE ENEMY_FACE {',
+  '.111.',
+  '11111',
+  '.101.',
+  '11111',
+  '.111.',
+  '}',
+  '',
+  '루루 FUNCTION SPAWN_ENEMY {',
+  'OBJECT 2 ENEMY 300 120 16 16 #f2585a',
+  'SET 2 SPRITE ENEMY_FACE',
+  '}',
+  '루루 END',
+  '루루 CALL SPAWN_ENEMY',
+  '',
+  'CAMERA FOLLOW player',
+  'CAMERA ZOOM 1',
+  '',
+  'SET RAM[0] 100',
+  'SET RAM[1] 100',
+  '',
+  '룰랄 RAM[240] == 1 {',
+  '  SET RAM[1] RAM[1] - 2',
+  '}',
+  '룰랄 RAM[242] == 1 {',
+  '  SET RAM[1] RAM[1] + 2',
+  '}',
+  '룰랄 RAM[241] == 1 {',
+  '  SET RAM[0] RAM[0] - 2',
+  '}',
+  '룰랄 RAM[243] == 1 {',
+  '  SET RAM[0] RAM[0] + 2',
+  '}',
+  '',
+  'SET player X RAM[0]',
+  'SET player Y RAM[1]',
+  '',
+  'CLEAR',
+  'RENDER',
+  'TEXT 10 10 "Lullang IDE v4.0 - WASD 이동"',
+  '',
+  'SET RAM[5] 0',
+  'TOUCH PLAYER ENEMY {',
+  '  SET RAM[5] 1',
+  '}',
+  '룰랄 RAM[5] == 1 {',
+  '  TEXT 10 24 "충돌 감지!"',
+  '} 아니면 {',
+  '  TEXT 10 24 "안전"',
+  '}'
+].join('\n');
+
+const LullangFS = {
+  files: {
+    'main.lul': LULLANG_DEFAULT_MAIN,
+    'player.lul': [
+      '// 플레이어 전용 스니펫 예시 (참고용) — 현재는 열려있는 파일만 RUN에서 실행됩니다.',
+      'OBJECT 1 PLAYER 50 50 16 16 #5fd097',
+      'SET RAM[240] 0',
+      '룰랄 RAM[240] == 1 {',
+      '  SET 1 X 60',
+      '}'
+    ].join('\n'),
+    'enemy.lul': [
+      '// 적 스폰 함수 예시 (참고용)',
+      '루루 FUNCTION SPAWN_ENEMY {',
+      '  OBJECT 2 ENEMY 200 100 16 16 #f2585a',
+      '}',
+      '루루 END',
+      '루루 CALL SPAWN_ENEMY'
+    ].join('\n'),
+    'map.lul': [
+      '// 타일맵 예시 (참고용)',
+      'MAP',
+      '##########',
+      '#........#',
+      '#..P.....#',
+      '#........#',
+      '##########',
+      'ENDMAP'
+    ].join('\n'),
+    'sprite.lul': [
+      '// 스프라이트 예시 (참고용)',
+      '루루 SPRITE HERO {',
+      '.11.',
+      '1111',
+      '.11.',
+      '}'
+    ].join('\n'),
+    'functions.lul': [
+      '// 함수 예시 (참고용)',
+      '루루 FUNCTION HEAL {',
+      '  SET RAM[50] 100',
+      '}',
+      '루루 END',
+      '루루 FUNCTION DAMAGE {',
+      '  SET RAM[50] RAM[50] - 10',
+      '}',
+      '루루 END'
+    ].join('\n')
+  },
+  activeFile: 'main.lul',
+  order: ['main.lul', 'player.lul', 'enemy.lul', 'map.lul', 'sprite.lul', 'functions.lul'],
+  getActive() { return this.files[this.activeFile]; },
+  save(content) { this.files[this.activeFile] = content; },
+  setActive(name) { this.activeFile = name; }
+};
+
+/* =========================================================================
+   14. CODE EDITOR (line numbers, tab support, auto-indent, highlight)
+   ========================================================================= */
+const editorInput = document.getElementById('codeEditorInput');
+const editorHighlight = document.getElementById('codeHighlight');
+const lineGutter = document.getElementById('lineGutter');
+
+function escapeHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function highlightLullang(src) {
+  let html = escapeHtml(src);
+  html = html.replace(/(\/\/.*)$/gm, '<span class="tok-comment">$1</span>');
+  html = html.replace(/"([^"]*)"/g, '<span class="tok-string">"$1"</span>');
+  html = html.replace(/#[0-9a-fA-F]{3,6}\b/g, m => '<span class="tok-color">' + m + '</span>');
+  html = html.replace(/\b(\d+(\.\d+)?)\b/g, '<span class="tok-number">$1</span>');
+  html = html.replace(/(룰랄|아니면|루루|FUNCTION|END|CALL|SPRITE|OBJECT|WALL|SET|RAM|CLEAR|RENDER|TEXT|MAP|ENDMAP|TOUCH|CAMERA|ISCOLLIDE|COLLIDE|FOLLOW|ZOOM)/g, '<span class="tok-keyword">$1</span>');
+  html = html.replace(/\b(PLAYER|NPC|ENEMY|PROJECTILE|ITEM|CUSTOM)\b/g, '<span class="tok-type">$1</span>');
+  return html;
+}
+function updateLineGutter(text) {
+  const n = text.split('\n').length;
+  let out = '';
+  for (let i = 1; i <= n; i++) out += i + '\n';
+  lineGutter.textContent = out;
+}
+function refreshEditorView() {
+  const val = editorInput.value;
+  editorHighlight.innerHTML = highlightLullang(val) + '\n';
+  updateLineGutter(val);
+}
+editorInput.addEventListener('input', () => { refreshEditorView(); LullangFS.save(editorInput.value); });
+editorInput.addEventListener('scroll', () => {
+  editorHighlight.scrollTop = editorInput.scrollTop; editorHighlight.scrollLeft = editorInput.scrollLeft;
+  lineGutter.scrollTop = editorInput.scrollTop;
+});
+editorInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const start = editorInput.selectionStart, end = editorInput.selectionEnd;
+    editorInput.value = editorInput.value.slice(0, start) + '  ' + editorInput.value.slice(end);
+    editorInput.selectionStart = editorInput.selectionEnd = start + 2;
+    refreshEditorView(); LullangFS.save(editorInput.value);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const start = editorInput.selectionStart;
+    const value = editorInput.value;
+    const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+    const currentLine = value.slice(lineStart, start);
+    const indentMatch = currentLine.match(/^\s*/);
+    let indent = indentMatch ? indentMatch[0] : '';
+    if (currentLine.trim().endsWith('{')) indent += '  ';
+    const insertion = '\n' + indent;
+    editorInput.value = value.slice(0, start) + insertion + value.slice(start);
+    editorInput.selectionStart = editorInput.selectionEnd = start + insertion.length;
+    refreshEditorView(); LullangFS.save(editorInput.value);
+  }
+});
+
+function loadFileIntoEditor(name) {
+  LullangFS.setActive(name);
+  editorInput.value = LullangFS.getActive();
+  refreshEditorView();
+  document.getElementById('editorFileBadge').textContent = name;
+  document.getElementById('topActiveFile').textContent = name;
+  renderExplorer();
+}
+
+/* =========================================================================
+   15. EXPLORER UI
+   ========================================================================= */
+const explorerListEl = document.getElementById('explorerList');
+function renderExplorer() {
+  explorerListEl.innerHTML = '';
+  LullangFS.order.forEach(name => {
+    const row = document.createElement('div');
+    row.className = 'file-item' + (name === LullangFS.activeFile ? ' active' : '');
+    row.innerHTML = '<span class="file-icon">▤</span><span>' + name + '</span>';
+    row.addEventListener('click', () => loadFileIntoEditor(name));
+    explorerListEl.appendChild(row);
+  });
+  document.getElementById('fileCountBadge').textContent = LullangFS.order.length + ' files';
+}
+document.getElementById('newFileBtn').addEventListener('click', () => {
+  const name = prompt('새 파일 이름 (예: boss.lul)');
+  if (!name) return;
+  const finalName = name.endsWith('.lul') ? name : name + '.lul';
+  if (LullangFS.files[finalName] !== undefined) { alert('이미 존재하는 파일입니다.'); return; }
+  LullangFS.files[finalName] = '// 새 파일\n';
+  LullangFS.order.push(finalName);
+  loadFileIntoEditor(finalName);
+});
+
+/* =========================================================================
+   16. ANALYZER PANEL (tokens / AST / problems / console)
+   ========================================================================= */
+document.querySelectorAll('.analyzer-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.analyzer-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.an-view').forEach(v => v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-' + btn.dataset.tab).classList.add('active');
+  });
+});
+function renderConsole() {
+  const el = document.getElementById('view-console');
+  if (!consoleLines.length) { el.innerHTML = '<div class="an-empty">콘솔 출력이 여기에 표시됩니다.</div>'; return; }
+  el.innerHTML = consoleLines.map(c => '<div class="console-row ' + c.kind + '">[' + c.t + '] ' + escapeHtml(c.text) + '</div>').join('');
+  el.scrollTop = el.scrollHeight;
+}
+function renderTokensView(sourceText) {
+  try {
+    const exprLines = sourceText.split('\n').filter(l => /[=<>!]|RAM\[|ISCOLLIDE/.test(l));
+    const dump = exprLines.slice(0, 40).map(l => {
+      const tokens = new LullangTokenizer(l).tokenize().filter(t => t.type !== 'EOF');
+      return l.trim() + '\n  -> ' + tokens.map(t => t.type + ':' + t.value).join(' | ');
+    }).join('\n\n');
+    document.getElementById('tokenView').textContent = dump || '(표시할 표현식이 없습니다)';
+  } catch (e) { document.getElementById('tokenView').textContent = '토큰화 실패: ' + e.message; }
+}
+function renderAstView(program) {
+  document.getElementById('astView').textContent = JSON.stringify(program, null, 2);
+}
+function renderProblems() {
+  const el = document.getElementById('view-problems');
+  document.getElementById('problemCountBadge').textContent = problems.length + ' problems';
+  if (!problems.length) { el.innerHTML = '<div class="an-empty" id="problemsEmpty">오류/경고 없음</div>'; return; }
+  el.innerHTML = problems.map(p =>
+    '<div class="problem-row ' + (p.severity === 'warning' ? 'warning' : '') + '">' +
+    '<div class="p-head">[' + p.severity.toUpperCase() + ' · ' + p.type + '] Line ' + p.line + ': ' + escapeHtml(p.message) + '</div>' +
+    '<div class="p-suggest">💡 ' + escapeHtml(p.suggestion) + '</div></div>'
+  ).join('');
+}
+
+/* =========================================================================
+   17. OBJECT MANAGER PANEL (live list) + RUN / STOP / RESTART
+   ========================================================================= */
+const objectListBody = document.getElementById('objectListBody');
+function renderObjectList() {
+  const objs = LullangObjectManager.all();
+  document.getElementById('objCountBadge').textContent = objs.length;
+  if (!objs.length) { objectListBody.innerHTML = '<div class="obj-empty">오브젝트가 없습니다.</div>'; return; }
+  objectListBody.innerHTML = objs.map(o =>
+    '<div class="obj-row"><span class="obj-id">' + o.id + '</span><span class="obj-type">' + o.type + '</span><span>(' + Math.round(o.x) + ',' + Math.round(o.y) + ')</span></div>'
+  ).join('');
+}
+
+const lullangCanvasEl = document.getElementById('lullangCanvas');
+const LullangRenderer = new LullangRendererClass(lullangCanvasEl);
+LullangInput.bindCanvas(lullangCanvasEl);
+
+let lullangRunning = false;
+let lullangFrameCount = 0, lullangFpsLastSample = performance.now(), lullangFps = 0;
+const fpsBadgeEl = document.getElementById('fpsBadge');
+const runStatusEl = document.getElementById('topRunStatus');
+
+function lullangGameLoop(now) {
+  if (!lullangRunning) return;
+  lullangFrameCount++;
+  if (now - lullangFpsLastSample >= 500) {
+    lullangFps = Math.round(lullangFrameCount / ((now - lullangFpsLastSample) / 1000));
+    lullangFrameCount = 0; lullangFpsLastSample = now;
+    fpsBadgeEl.textContent = lullangFps + ' FPS';
+  }
+  LullangInput.syncToRam();
+  LullangCamera.update(lullangCanvasEl.width, lullangCanvasEl.height);
+  try {
+    LullangInterpreter.runFrame();
+  } catch (err) {
+    lullangRunning = false;
+    runStatusEl.textContent = 'error';
+    const e = err instanceof LullangError ? err : new LullangError('RUNTIME', err.message, '?', '런타임 오류입니다. Problems 탭을 확인하세요.');
+    pushProblem('error', e.errType, e.message, e.line, e.suggestion);
+    consoleLog('err', '실행 중단: ' + e.message);
+    return;
+  }
+  renderObjectList();
+  requestAnimationFrame(lullangGameLoop);
+}
+
+function compileActiveFile() {
+  clearProblems();
+  const source = editorInput.value;
+  try {
+    const program = LullangInterpreter.compile(source);
+    renderAstView(program);
+    renderTokensView(source);
+    consoleLog('info', LullangFS.activeFile + ' 컴파일 성공 (' + program.length + '개 최상위 구문)');
+    return true;
+  } catch (err) {
+    const e = err instanceof LullangError ? err : new LullangError('COMPILE', err.message, '?', '문법을 다시 확인하세요.');
+    pushProblem('error', e.errType, e.message, e.line, e.suggestion);
+    consoleLog('err', '컴파일 실패: ' + e.message);
+    return false;
+  }
+}
+
+document.getElementById('runBtn2').addEventListener('click', () => {
+  if (lullangRunning) return;
+  if (!compileActiveFile()) { runStatusEl.textContent = 'compile error'; return; }
+  lullangRunning = true;
+  runStatusEl.textContent = 'running';
+  consoleLog('info', 'RUN — ' + LullangFS.activeFile);
+  requestAnimationFrame(lullangGameLoop);
+});
+document.getElementById('stopBtn2').addEventListener('click', () => {
+  lullangRunning = false;
+  runStatusEl.textContent = 'stopped';
+  consoleLog('info', 'STOP');
+});
+document.getElementById('restartBtn2').addEventListener('click', () => {
+  lullangRunning = false;
+  LullangObjectManager.clearAll();
+  for (let i = 0; i < RAM_SIZE; i++) RAM[i] = 0;
+  LullangCamera.x = 0; LullangCamera.y = 0; LullangCamera.zoom = 1; LullangCamera.followId = null;
+  LullangTileManager.rows = [];
+  clearProblems();
+  consoleLog('info', 'RESTART — 상태 초기화 완료');
+  renderObjectList();
+  if (!compileActiveFile()) { runStatusEl.textContent = 'compile error'; return; }
+  lullangRunning = true;
+  runStatusEl.textContent = 'running';
+  requestAnimationFrame(lullangGameLoop);
+});
+
+/* =========================================================================
+   18. BOOT
+   ========================================================================= */
+renderExplorer();
+loadFileIntoEditor('main.lul');
+renderConsole();
+renderProblems();
+consoleLog('info', 'Lullang IDE v4.0 초기화 완료. RUN을 눌러 main.lul을 실행하세요.');
+})();
+</script>
+</body>
+</html>
+코드가 엄청나게 긴데 별로 쓸모 있진 않스무니다 
+쉬운 게임은 구현이 가능하무니다 아마도?
