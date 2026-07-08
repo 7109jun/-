@@ -1,0 +1,191 @@
+룰루랄라 프로그래밍언어...
+# 프로젝트 작업 기록 (Session Log)
+ 
+> 이 문서는 지금까지 진행한 두 개의 독립적인 프로젝트 — **Lathe Studio (CO/LT/MN 엔진)** 와 **Lullang IDE v4.0** — 의 전체 작업 이력, 아키텍처, 파일 구조, 남은 작업을 정리한 기록입니다. 향후 다른 세션에서 이어서 작업할 때 이 문서 하나만 읽으면 전체 맥락을 파악할 수 있도록 작성했습니다.
+ 
+---
+ 
+## 목차
+ 
+1. [프로젝트 A: Lathe Studio (CO/LT/MN 엔진)](#프로젝트-a-lathe-studio-coltmn-엔진)
+2. [프로젝트 B: Lullang IDE v4.0](#프로젝트-b-lullang-ide-v40)
+3. [공통 개발 방식 / 검증 방법론](#공통-개발-방식--검증-방법론)
+4. [남은 작업 / 다음 단계](#남은-작업--다음-단계)
+---
+ 
+## 프로젝트 A: Lathe Studio (CO/LT/MN 엔진)
+ 
+### 개요
+ 
+"CO/LT/MN"이라는 뒤집힌 권한 서열(1위 CO, 2위 LT, 3위 MN)과 `mn* → lt* → co* → mn*` 무한 신호 순환 체계를 가진 웹 기반 게임/인터랙션 엔진 프레임워크. 최종적으로 **Lathe Studio**라는 이름의 웹 IDE로 발전.
+ 
+### 계층 규칙 (절대 불변)
+ 
+| 계층 | 순위 | 역할 | 제약 |
+|---|---|---|---|
+| **CO** (Object) | 1위 | 렌더링, 트랜지션, 펄스 애니메이션 | 내부에 조건문(`if`/`for`)·상태 연산 절대 금지. `<co-object>` 커스텀 엘리먼트로만 구현 |
+| **LT** (Logic) | 2위 | 벡터/쿼터니언/물리/AI 연산 | Stateless 순수 함수만. 인자→반환값 구조, DOM 접근 금지 |
+| **MN** (Manager) | 3위 | 전역 싱글톤 | 오브젝트 풀링(24개 캡+LRU), 히트스톱, localStorage 오토세이브 |
+ 
+신호 버스는 `CustomEvent` 기반 `SignalBus` 클래스로 구현되어 있고, 모든 실행은 배경에서 `mn* → lt* → co* → mn*` 순으로 로그에 색상 코드(보라/시안/골드)로 찍힘.
+ 
+### 파일 이력 (시간 순)
+ 
+| 파일명 | 내용 |
+|---|---|
+| `co-lt-mn-framework.html` | 최초 프로토타입. SignalBus, `<co-object>` 커스텀 엘리먼트, `LAYER : Target Func(key:value) *-> ...` 문법 파서, 마인크래프트/울트라킬 시나리오 프리셋 2개, 3분할 UI (에디터/스테이지/타임라인) |
+| `doom-colt-mn-engine.html` | CO 80개 + LT 80개 + MN 40개 = **총 200개 내장 함수 라이브러리**. 세로형 블록 DSL(`CO: Target.Name { Input: ... Action: ... *Output: signal* }`). 실제 플레이 가능한 탑다운 DOOM 스타일 캔버스(WASD 이동, 벽 충돌, Imp AI, 파이어볼, 마우스 클릭 패링+리플렉트+히트스톱) |
+| `dash-afterimage-module.html` | 울트라킬 스타일 대시+잔상 시스템 데모. CO(무조건문 렌더 전용)/LT(7개 순수함수: 벡터, 잔상 스폰 타이밍, 쿼터니언, AABB)/MN(24캡 풀링+오토세이브) 계층 순수성을 엄격히 지킨 예시 |
+| `co-lt-mn-optimized-engine.html` | **← 최종 통합 "Lathe Studio" 본체.** 아래 참조 |
+ 
+### `co-lt-mn-optimized-engine.html` — 최종 본체 상세
+ 
+**핵심 시스템**
+- `Vec3` / `Quat` 순수 수학 라이브러리 (내적/외적/정규화/쿼터니언 회전)
+- `LT.Calculate_Chunk_Voxel`, `LT.Predict_Bullet_Vector`, `LT.Apply_Quaternion_Rotation`, `LT.Calculate_Raycast_Intersection`(레이-구 교차 실제 이차방정식), `LT.Smooth_Damp_Filter`(Unity식 critically-damped 스프링 공식)
+- `<co-object>` — CSS 커스텀 프로퍼티(`--pulse-scale`, `--geometry-color`, `--transition-speed`, `--emission-intensity`)로만 제어. **분기문 0개.**
+- `MN` 싱글톤 — 24개 캡 오브젝트 풀 + **LRU 락(lock) 메커니즘**: `ownerId`가 `bullet_`로 시작하지 않으면 `isLocked=true`가 부여되어 절대 강제 회수되지 않음. 풀이 전부 잠겨 있으면 `null` 반환 + 에러 로그(조용히 실패하지 않음)
+- 비동기 타임-슬라이싱 DSL 파서(`compileScriptAsync`) — `setTimeout(0)`으로 4ms씩 양보하며 메인 스레드 논블로킹 파싱
+- **Object Manager (Hierarchy)** — `SceneObject`/`SceneObjectManager` 클래스. 생성/삭제(재귀 cascade)/이름변경/복제(서브트리 딥클론)/부모-자식(HTML5 드래그앤드롭, 순환 참조 방어)/선택. 각 오브젝트는 `MN.acquire()`로 실제 풀링된 `<co-object>` 하나를 물고 있어서 트리 패널과 3D 스테이지가 항상 동기화됨
+- **3D 계층 트랜스폼** — `LT.Compute_Hierarchical_Transform(localPos, parentGlobalPos)` 순수 함수 + `gameLoop` 안의 `updateSceneHierarchyTransforms()`가 매 프레임 루트부터 DFS로 내려가며 부모→자식 글로벌 좌표를 누적 합성
+- **커스텀 타깃 DSL 라우팅** — `findObjectByName(name)`이 씬 그래프를 재귀 탐색해서, DSL 스크립트에서 `Box_01` 같은 사용자 정의 오브젝트 이름을 타깃으로 쓰면 `Set_Emission`/`Set_Color`/`Pulse`(CO), `MoveXYZ`(LT)가 실제로 그 오브젝트에 적용됨
+- **Unity 스타일 3D/2D 토글** — `<co-object>`의 위치를 `--pos-x/--pos-y/--pos-z` CSS 커스텀 프로퍼티로 쓰도록 변경(여전히 CO는 무조건문). 2D 모드는 `#stage3d.mode-2d co-object{ --pos-z:0px !important; }` 로 **JS 조건문 없이 순수 CSS로** 오소그래픽 전환
+- 호환용 전역 별칭: `window.LatheStudio.objectManager`, `window.SceneHierarchy`(라이브 getter), `window.renderTree()`, `window.findObjectByName()`
+**패널 구조**: Hierarchy(Object Manager) · Editor(DSL 스크립트) · Scene(3D 스테이지+3D/2D 토글) · Console(신호 순환 타임라인)
+ 
+### 검증 이력 (중요 — 이유가 있음)
+ 
+이 프로젝트 도중 사용자가 두 차례 "Object A를 수정하면 Object B도 같이 바뀐다"는 **참조 공유 버그**를 보고했습니다. 실제 코드를 Node로 추출해서 격리 테스트를 돌린 결과:
+ 
+```
+TEST A: 독립 생성 후 A만 수정 → B 영향 없음 (a.transform === b.transform → false)
+TEST B: Duplicate 후 클론 수정 → 원본 불변 (src.slot === clone.slot → false)
+TEST C: 형제 오브젝트 → 서로 완전 독립
+TEST D: 중첩 서브트리 복제 → 원본/복제 완전 독립
+```
+**→ 버그가 실제로 존재하지 않음을 확인.** 이후 사용자가 "다른 프로젝트(Lullang)를 착각해서 준 것"이라고 정정함. **교훈: 사용자가 버그를 보고해도 반드시 실제 코드로 재현 테스트를 먼저 돌리고, 재현 안 되면 "고쳤다"고 거짓으로 코드를 새로 뱉지 않는다.**
+ 
+---
+ 
+## 프로젝트 B: Lullang IDE v4.0
+ 
+### 개요
+ 
+"룰랭(Lullang)"이라는 한국어 키워드 기반 자체 DSL + 인터프리터 + 미니 게임엔진을 얹은, **VS Code + Scratch + Godot를 합친 느낌**의 독립 웹 IDE. **Lathe Studio와는 완전히 무관한 별도 파일**(`lullang-ide-v4.html`)로 존재함 — 테마도 다름(VS Code 다크+블루 vs Lathe의 골드/시안/바이올렛), 엔진 코드도 100% 별개.
+ 
+### 룰랭(Lullang) DSL 문법 레퍼런스
+ 
+```
+SET RAM[n] expr              // RAM 슬롯에 값 대입 (256개 슬롯)
+OBJECT id TYPE x y w h color // 오브젝트 생성/갱신 (id 기준 idempotent)
+WALL x y w h                 // 벽 오브젝트 단축 생성
+SET id PROP value            // 오브젝트 속성 변경 (X/Y/WIDTH/HEIGHT/SIZE/COLOR/VISIBLE/SPRITE/LAYER/ANGLE/SCALE/ACTIVE)
+CLEAR / RENDER                // 캔버스 초기화 / 렌더 큐 flush
+TEXT x y "문자열"              // 화면에 텍스트 오버레이
+ 
+룰랄 <조건> {                  // IF
+  ...
+} 아니면 {                     // ELSE
+  ...
+}
+룰랄 A {} 아니면 룰랄 B {} 아니면 {}   // ELSE IF 체인 지원 (재귀 파싱)
+ 
+루루 FUNCTION 이름 { ... }      // 함수 정의
+루루 END
+루루 CALL 이름                  // 함수 호출
+ 
+루루 SPRITE 이름 {              // 스프라이트 정의 (문자 그리드, 팔레트 매핑)
+.111.
+11111
+}
+ 
+MAP                            // 타일맵 (# = 벽, . = 바닥, P = 플레이어 스폰)
+##########
+#..P.....#
+##########
+ENDMAP
+ 
+TOUCH TYPE_A TYPE_B { ... }     // 매 프레임 AABB 충돌 시 실행
+CAMERA FOLLOW id / X n / Y n / ZOOM n
+ 
+// 표현식 문법 (RAM[]/숫자/괄호/사칙연산/나머지/비교/논리/ISCOLLIDE(a,b) 지원, eval·new Function 미사용)
+```
+ 
+**입력 예약 RAM 슬롯 (관례)**: `RAM[240..243]` = WASD, `RAM[244..247]` = 방향키, `RAM[248]` = 마우스 클릭, `RAM[249..250]` = 마우스 X/Y
+ 
+### 엔진 아키텍처 (모두 순수 JS 클래스, 서로 독립)
+ 
+| 클래스 | 역할 |
+|---|---|
+| `LullangTokenizer` | 표현식 문자열 → 토큰 스트림 |
+| `LullangExprParser` | 재귀 하강 파서 → 표현식 AST (연산자 우선순위: `\|\| → && → ==/!= → 비교 → +- → */% → 단항 → 원자`) |
+| `evaluateLullangExpr` | AST 재귀 평가 (eval/new Function 없이 순수 트리 인터프리트) |
+| `LullangStatementParser` | 줄 단위 + 중괄호 인지 파서. `MAP`/`SPRITE` 블록은 원본 라인 그대로 캡처. `parseBlock()`이 `} 아니면 {` 처럼 같은 줄에 닫는 중괄호+다음 토큰이 붙어있는 경우를 "라인 스플라이싱"으로 분리 처리 |
+| `LullangInterpreterClass` | `compile()` (FUNCTION/SPRITE/MAP 호이스팅 후 나머지를 매 프레임 실행되는 `mainBody`로 분리) + `runFrame()`. 사용되지 않는 함수는 컴파일 시 Warning 발생 |
+| `LullangObjectManagerClass` | id 기준 Map. 존재하면 갱신(idempotent), 없으면 생성 |
+| `LullangSpriteManagerClass` | 이름→문자 그리드 등록, 팔레트(`.`=투명, `0`~`7`=색상) 기반 픽셀 렌더 |
+| `LullangTileManagerClass` | MAP 파싱, 벽 타일을 `WALL` 오브젝트로 자동 생성, 렌더 |
+| `LullangCollisionManagerClass` | AABB 오버랩, id/타입 기준 충돌 판정 |
+| `LullangCameraClass` | follow/x/y/zoom |
+| `LullangInputManagerClass` | 키보드/마우스 상태 추적 → RAM 동기화 |
+| `LullangRendererClass` | tile → object(레이어+y 정렬) → text 순서로 캔버스에 그림 |
+ 
+### IDE 레이아웃 (VS Code 스타일, 2행 3열 그리드)
+ 
+```
+┌──────────────┬──────────────────────────────┬─────────────┐
+│ Game Screen  │ Code Editor                 │ Explorer    │
+├──────────────┼──────────────────────────────┤             │
+│ Objects      │ Code Analyzer / Console     │             │
+└──────────────┴──────────────────────────────┴─────────────┘
++ Status Bar (하단), 전역 Toolbar (상단)
+```
+ 
+### 구현된 기능 목록
+ 
+**1차 (기본 IDE)**
+- Game Screen: canvas + 카메라 + FPS
+- Code Editor: 줄 번호, 문법 하이라이트(정규식 기반 오버레이 `<pre>`+투명 `<textarea>`), Tab=공백 2칸, Enter 자동 들여쓰기(`{` 다음 줄 추가 들여쓰기)
+- Explorer: 가상 파일 시스템 (`main.lul`/`player.lul`/`enemy.lul`/`map.lul`/`sprite.lul`/`functions.lul`)
+- Object Manager: 실시간 오브젝트 목록 + RUN/STOP/RESTART
+- Code Analyzer: Console / Tokenizer 덤프 / Parser-AST(JSON) / Problems(Error·Warning + 줄번호 + 추천 해결법) 탭
+**2차 (Explorer + IDE 사용성 개선, "vNext" 요청 중 이 범위만 승인됨)**
+- **Explorer**: 실제 폴더 트리(`LullangFS.entries`/`rootIds`/`expanded` — 기존 `files`/`activeFile`/`getActive()`/`save()`/`setActive()` API는 100% 그대로 유지하고 그 위에 조직화 레이어만 추가), New File/Folder, Rename, Delete(재귀), Copy/Cut/Paste, Duplicate(서브트리 딥클론), 드래그앤드롭 재배치(순환 참조 방어), 폴더 접기/펼치기, 검색 필터, 열린 파일 강조, Ctrl/Shift 다중 선택
+- **Context Menu**: Explorer(New File/Folder, Rename, Duplicate, Copy/Cut/Paste, Delete, Properties) + Object 창(Copy Object, Duplicate, Focus Camera, Rename label, Delete) — 재사용 가능한 `showContextMenu(x,y,items)` 컴포넌트 하나로 양쪽 다 처리
+- **Game Screen**: Zoom 100/200/300/400%, Fit, Fullscreen, 스크린샷 저장(PNG 다운로드), Reset, 해상도 표시
+- **단축키**: Ctrl+N(새 파일)/Ctrl+Shift+N(새 폴더)/Ctrl+S(저장)/Ctrl+F(탐색기 검색 포커스)/Ctrl+D(줄 복제)/Ctrl+/(줄 주석 토글)/Delete(탐색기 항목 삭제)/F5(RUN)/Shift+F5(STOP)/Ctrl+R(RESTART)/F11(전체화면)
+- **UI**: 전역 아이콘 툴바, 하단 상태바(파일명/커서 위치/오브젝트 수/RAM 사용량/FPS/실행상태), 패널 접기 토글(각 패널 헤더의 `—` 버튼), 드래그로 크기 조절 가능한 컬럼 리사이저 2개
+- **에디터**: 자동 괄호/따옴표 닫기(`{`/`(`/`"` 입력 시 짝 자동 삽입)
+- Explorer 최적화: 매 렌더마다 행(row)별 리스너를 새로 붙이지 않고, `#explorerList` 컨테이너 하나에 **이벤트 위임(event delegation)** 하나만 사용
+### 검증 이력
+ 
+- 파서/인터프리터 핵심 로직을 **Node.js로 완전히 격리해서 먼저 유닛 테스트** (산술/비교/논리 표현식, RAM 읽기/쓰기, 중첩 IF/ELSE IF/ELSE, OBJECT 생성의 idempotent 여부, FUNCTION 정의+호출, TOUCH 충돌 판정, `ISCOLLIDE()`, MAP/SPRITE 블록 파싱, 문법 오류 시 `LullangError` 캐치) — **10개 테스트 전부 통과 확인 후** 실제 파일에 반영
+- 실제 파일을 **jsdom으로 로드해서 스크립트 전체를 실행** — 콘솔 에러 0건 확인 (jsdom 자체의 canvas/font 로드 미지원 경고만 있고 무해함)
+- New File/New Folder/검색 필터/우클릭 컨텍스트 메뉴/줌 버튼/패널 접기/Ctrl+N 단축키까지 **실제 DOM 이벤트를 dispatch해서 인터랙션 결과를 assert** — 전부 기대값과 일치
+- 패치 도중 **TDZ(Temporal Dead Zone) 버그 2건**을 jsdom 테스트로 실제로 잡음 (`objectListBody`와 `lullangCanvasEl`을 각각의 `const` 선언보다 앞에서 참조하던 코드) → 즉시 수정 확인 완료
+---
+ 
+## 공통 개발 방식 / 검증 방법론
+ 
+이 세션에서 일관되게 적용한 원칙:
+ 
+1. **큰 기능 요청은 실제 코드로 작성** — "생략"이나 TODO 없이 매 함수를 완전히 구현
+2. **기존 파일에 기능을 얹을 때는 `str_replace`로 외과적 수정만** — 전체 재작성 금지, 기존 id/class/변수명 보존
+3. **작성 후 반드시 실행 검증**:
+   - `node --check`로 JS 문법 오류 우선 차단 (이 과정에서 `/* mn*/lt*/co* */` 처럼 주석 안에 `*/`가 우연히 들어가 블록 주석이 조기 종료되는 실수를 실제로 잡아냄)
+   - 순수 로직(파서/인터프리터/수학 함수)은 Node로 추출해서 격리 유닛 테스트
+   - DOM이 얽힌 부분은 jsdom으로 실제 로드 + 이벤트 dispatch까지 실행해서 검증
+4. **사용자가 "버그가 있다"고 주장해도 먼저 재현 테스트** — 재현 안 되면 없는 버그를 고친 척 코드를 새로 뱉지 않고 사실대로 보고
+5. **프로젝트가 실제로 다른 것인지 항상 확인** — 이름이나 맥락이 애매하면 작업 전에 반드시 사용자에게 확인 질문
+---
+ 
+## 남은 작업 / 다음 단계
+ 
+### Lathe Studio
+- Inspector 패널 (위치/크기/회전/색상/Visible 편집 UI) — 아직 미구현
+- CO Editor의 자동완성/문법 하이라이트 고도화
+- Undo/Redo, History, Notification 시스템 — 우선순위 목록에 있었으나 미착수
+### Lullang IDE v4.0
+- vNext 요청 중 **이번 라운드에서 의도적으로 보류한 것들**: RAM Viewer 탭, Execution Flow 탭, Performance Monitor(Parser/Interpreter/Renderer 개별 타이밍), 완전한 미니맵, 완전한 자유 도킹형 패널(현재는 컬럼 리사이저 2개 + 접기만 지원), Object Manager의 Lock/Hide/Sort/검색, 완전한 실행취소(Undo/Redo) 히스토리 스택
+- 여러 파일을 동시에 실행하는 모듈/import 시스템은 아직 없음 (RUN은 현재 에디터에 열려 있는 파일 하나만 실행)
+---
