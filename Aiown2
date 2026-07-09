@@ -1,0 +1,220 @@
+이거 잘하면 성공할수도 있을거 같아서 2번째 만듬 
+문법	의미
+< >	이름 / 코드
+[ ]	숫자 / URL
+@ @	미디어
+~ ~	중요 정보
+! !	Boolean
+$ $	날짜
+/null/	Null
+% %	주석
+코드: <!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aiown v2.5 Compiler & Ecosystem</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --primary-blue: #38bdf8;
+            --accent-green: #34d399;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { margin: 0; background-color: var(--bg-color); color: var(--text-main); padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header { text-align: center; padding: 30px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        header h1 { color: var(--primary-blue); margin: 0 0 10px 0; font-size: 28px; }
+        header p { color: var(--text-muted); margin: 0; }
+        .badge { background: #0284c7; color: white; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 25px; }
+        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; }
+        .card h2 { margin-top: 0; font-size: 18px; color: var(--accent-green); border-bottom: 1px solid var(--border); padding-bottom: 10px; display: flex; justify-content: space-between; }
+        textarea { width: 100%; height: 450px; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; color: #e2e8f0; padding: 15px; font-family: 'Fira Code', Consolas, monospace; font-size: 14px; resize: none; line-height: 1.6; }
+        textarea:focus { outline: 2px solid var(--primary-blue); }
+        .btn-center { text-align: center; margin: 20px 0; }
+        button { background: linear-gradient(135deg, #38bdf8, #0284c7); color: white; border: none; padding: 14px 40px; font-size: 16px; font-weight: bold; border-radius: 30px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 14px rgba(56, 189, 248, 0.3); }
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56, 189, 248, 0.4); }
+        .spec-box { background: #0f172a; border-left: 4px solid var(--primary-blue); padding: 20px; border-radius: 0 12px 12px 0; margin-top: 20px; }
+        .spec-box table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .spec-box th, .spec-box td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
+        .spec-box th { color: var(--primary-blue); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>⚡ Aiown v2.5 (AI-owned Document Format) Compiler</h1>
+        <p>인간 중심의 Markdown 문서를 AI 최적화 초고속 파싱 포맷인 Aiown(.aiown)으로 컴파일합니다. <span class="badge">v2.5 Open Spec</span></p>
+    </header>
+
+    <div class="grid">
+        <div class="card">
+            <h2>📝 Human-Readable (Markdown Input)</h2>
+            <textarea id="mdInput" placeholder="이곳에 마크다운 문서를 입력하세요..."></textarea>
+        </div>
+        <div class="card">
+            <h2>🤖 AI-Readable (Aiown v2.5 Output)</h2>
+            <textarea id="aiownOutput" readonly placeholder="컴파일된 Aiown 결과가 여기에 출력됩니다."></textarea>
+        </div>
+    </div>
+
+    <div class="btn-center">
+        <button onclick="compileToAiown()">🚀 Aiown 엔진으로 컴파일 실행</button>
+    </div>
+
+    <div class="spec-box">
+        <h3>📐 Aiown v2.5 문법 명세 매핑 테이블 (Spec Summary)</h3>
+        <table>
+            <tr><th>기호 패턴</th><th>컴파일 타겟 구조</th><th>설명</th></tr>
+            <tr><td><code>&lt;값&gt;</code></td><td>이름 (Name / Identifier)</td><td>고유 명사, 식별자, 데이터 항목명 명시</td></tr>
+            <tr><td><code>[값]</code></td><td>코드 (Code / Script block)</td><td>실행 가능한 소스 코드 및 명령어 블록 분리</td></tr>
+            <tr><td><code>숫자 (Raw)</code></td><td>숫자 (Numeric)</td><td>나이, 버전, 개수 등 순수 수치 데이터</td></tr>
+            <tr><td><code>@값@</code></td><td>URL / URI Link</td><td>참조 외부 웹 링크 주소 처리</td></tr>
+            <tr><td><code>~값~</code></td><td>미디어 (Media Path)</td><td>이미지 및 미디어 파일 경로 (.png, .jpg 등) 매핑</td></tr>
+            <tr><td><code>!값!</code></td><td>중요 정보 (High Priority)</td><td>AI RAG 가중치 최고 등급 지정 데이터</td></tr>
+            <tr><td><code>$값$</code></td><td>Boolean</td><td>true / false 판단형 논리 데이터</td></tr>
+            <tr><td><code>%값%</code></td><td>날짜 / null / Null</td><td>특정 타임스탬프 또는 빈 값 명시</td></tr>
+            <tr><td><code>// 값</code></td><td>주석 (Comment)</td><td>컴파일러가 해석하지 않고 건너뛰는 문장</td></tr>
+            <tr><td><code>,</code></td><td>Object Delimiter</td><td>단일 행 내부에서 데이터 객체 간 경계를 설정</td></tr>
+        </table>
+    </div>
+</div>
+
+<script>
+    // 기본 샘플 템플릿 로드 (신규 문법 요소 반영)
+    window.onload = function() {
+        document.getElementById('mdInput').value = `# 프로젝트: Cryptos\n# 버전: 3.6\n# 업데이트일자: 2026-06-30\n# 활성화여부: true\n\n// 이 라인은 주석입니다. 컴파일 시 제외됩니다.\n\n## 1. 개요\n**Cryptos**는 윙딩폰트(Wingdings Font)를 이용한 독특한 **암호 언어**입니다!\n\n\`\`\`\n예시: Hello\n↓\n📄︎🙧♏︎●︎□\n\`\`\`\n\n## 2. 기본 문자 변환 규칙\n| 알파벳 | 기호값 | 분류 |\n|---|---|---|\n| a | ♋︎ | 기본문자 |\n| b | ♌︎ | 기본문자 |\n| c | ♍︎ | 기본문자 |\n\n## 3. 리소스 및 자원 링크\n상세 정보는 메인 저장소인 https://github.com/7109jun/cryptos 에서 확인 가능합니다.\n\n![로고 이미지](logo.png)`;
+    };
+
+    function compileToAiown() {
+        const input = document.getElementById('mdInput').value;
+        const lines = input.split('\n');
+        let output = [];
+        let inCodeBlock = false;
+        let codeContent = [];
+        let inTable = false;
+        let tableHeaders = [];
+        let tableRows = [];
+
+        // 정규식 매핑 기준 정의
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const imgRegex = /!\[.*?\]\((.*?)\)/g;
+        const boldRegex = /\*\*(.*?)\*\*/g;
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        const boolRegex = /^(true|false)$/i;
+        const nullRegex = /^(null|Null)$/;
+
+        // 값 속성에 따른 신규 토큰 생성 헬퍼 함수
+        function parseValue(val) {
+            if (boolRegex.test(val)) return `$${val}$`;
+            if (dateRegex.test(val) || nullRegex.test(val)) return `%${val}%`;
+            if (urlRegex.test(val)) return val.replace(urlRegex, '@$1@');
+            if (!isNaN(val) && val !== '') return val; // 순수 숫자
+            return `<${val}>`; // 기본 텍스트 (이름/식별자)
+        }
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+
+            // 0. 주석 처리 (//)
+            if (line.startsWith('//')) {
+                continue; 
+            }
+
+            // 1. 코드 블록 처리 (``` -> [코드])
+            if (line.startsWith('```')) {
+                if (!inCodeBlock) {
+                    inCodeBlock = true;
+                    codeContent = [];
+                } else {
+                    inCodeBlock = false;
+                    output.push(`* [ \n${codeContent.join('\n')}\n]`);
+                }
+                continue;
+            }
+            if (inCodeBlock) {
+                codeContent.push(lines[i]);
+                continue;
+            }
+
+            // 2. 마크다운 표 처리
+            if (line.startsWith('|')) {
+                if (line.includes('---') || line.includes(':-')) continue;
+                let cells = line.split('|').map(c => c.trim()).filter(c => c !== '');
+                if (!inTable) {
+                    inTable = true;
+                    tableHeaders = cells;
+                } else {
+                    tableRows.push(cells);
+                }
+                continue;
+            } else {
+                if (inTable) {
+                    tableRows.forEach(row => {
+                        let rowTokens = [];
+                        tableHeaders.forEach((header, idx) => {
+                            let val = row[idx] ? row[idx] : '';
+                            rowTokens.push(`<${header}> ${parseValue(val)}`);
+                        });
+                        output.push(`* ${rowTokens.join(', ')}`);
+                    });
+                    output.push('');
+                    inTable = false; tableHeaders = []; tableRows = [];
+                }
+            }
+
+            // 3. 메타데이터 생성 규칙 (# 구조화)
+            if (line.startsWith('#') && !line.startsWith('##')) {
+                let content = line.replace(/^#\s*/, '');
+                if (content.includes(':')) {
+                    let parts = content.split(':');
+                    let key = parts[0].trim();
+                    let val = parts.slice(1).join(':').trim();
+                    output.push(`# <${key}> ${parseValue(val)}`);
+                } else {
+                    output.push(line);
+                }
+                continue;
+            }
+
+            // 4. 인라인 요소 컴파일
+            // 이미지 처리: ![alt](path) -> ~path~ (미디어)
+            line = line.replace(imgRegex, '~$1~');
+
+            // 중요 정보 처리: **텍스트** -> !텍스트! (중요 정보)
+            line = line.replace(boldRegex, '!$1!');
+
+            // 본문 내 독립 URL 처리: http... -> @http...@
+            line = line.replace(urlRegex, '@$1@');
+
+            if (line !== '') {
+                output.push(line);
+            } else if (lines[i] === '') {
+                output.push('');
+            }
+        }
+
+        // 잔여 표 데이터 마감
+        if (inTable) {
+            tableRows.forEach(row => {
+                let rowTokens = [];
+                tableHeaders.forEach((header, idx) => {
+                    let val = row[idx] ? row[idx] : '';
+                    rowTokens.push(`<${header}> ${parseValue(val)}`);
+                });
+                output.push(`* ${rowTokens.join(', ')}`);
+            });
+        }
+
+        document.getElementById('aiownOutput').value = output.join('\n');
+    }
+</script>
+</body>
+</html>
