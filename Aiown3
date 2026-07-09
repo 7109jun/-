@@ -1,0 +1,453 @@
+안녕하스무니다 
+이걸 하루에 9번 작업했는데 좀 힘드니무니다 
+원리
+## 1. 마크다운 ➔ Aiwon 전환 메커니즘 (Compiler)
+
+컴파일러는 줄 바꿈(`\n`)을 기준으로 문서를 행 단위로 분할한 뒤, 순차적으로 탐색하며 3단계 전처리 및 토큰화 프로세스를 수행합니다.
+
+### ① [최우선] 코드 블록 펜스 격리
+* **목적:** 텍스트 내부의 소스코드 주석(`//`)이나 특수문자가 일반 데이터 변환 규칙과 충돌하는 것을 방지합니다.
+* **원리:** 문장 시작점의 ```` ``` ```` 문법을 가장 먼저 감지합니다. 코드 블록 진입이 확인되면 내부의 모든 행과 기호는 변환 연산에서 제외(Skip)되며, 최종 출력 시 전체 소스코드를 대괄호 `[`와 `]` 기호로 감싸 단일 데이터 덩어리(Code Block)로 격리 처리합니다.
+
+### ② 구조적 데이터 추출 및 압축
+* **메타데이터 (# 키: 값):** 행의 시작이 `#`이면서 `:`를 포함하는 속성 정의문은 식별자 구조로 분해됩니다. 키 이름은 `< >`로 감싸고, 값은 데이터 타입(Boolean, Date, Null, Numeric 등)을 정규식으로 검사하여 알맞은 기호를 부착한 뒤 `# <키>=기호값기호` 형태로 재조립합니다.
+* **표 (Table 구조):** 파이프(`|`) 기호를 기준으로 열 헤더(Header)와 데이터 행(Row)을 분리합니다. 이후 각 셀의 데이터를 추출하여 타입을 판별한 뒤, 데이터 유실을 막기 위해 `| <열이름>=파싱값, <열이름2>=파싱값 |` 형태로 구조화하여 단일 행 객체로 압축합니다.
+
+### ③ 인라인 요소 토큰화 (정규식 파이프라인)
+일반 본문 영역은 정규식을 통해 순차적으로 치환됩니다. 
+* **미디어 및 URI 보존:** 마크다운의 이미지(`![alt](path)`)와 링크(`[text](url)`) 구조는 괄호 파편이 상호 간섭을 일으키지 않도록 내부 구분자 `|`를 도입하여 `~alt|path~` (Media) 및 `@text|url@` (URI) 형태로 명확히 경계를 나눕니다.
+* **강조 표식:** `**텍스트**` 패턴은 최하위 우선순위로 매핑되어 `%텍스트%` (Comment/Bold)로 바뀝니다.
+
+---
+
+## 2. Aiwon ➔ 마크다운 복원 메커니즘 (Depiler)
+
+역컴파일러는 컴파일된 결과물을 다시 마크다운의 표준 문법으로 역산하여 상태를 원형 그대로 보존(Lossless)하는 과정을 수행합니다.
+
+### ① ① 블록 구조의 원상복구
+* **코드 블록 환원:** 대괄호 단독 행인 `[`를 만나면 마크다운 코드 블록의 시작인 ```` ``` ````로 변경하고, `]`를 만나면 닫는 ```` ``` ````로 복원하여 내부 소스코드를 원형 그대로 방출합니다.
+* **메타데이터 복원:** `# <키>=값` 구조를 정규식 캡처 그룹으로 인지하여 `< >` 식별자 기호를 제거하고, `=`을 다시 마크다운 속성 지시어인 `: `로 치환하여 원상태로 돌립니다.
+
+### ② 표(Table) 객체의 레이아웃 재구성
+Aiwon 포맷의 `| <key>=val, <key2>=val2 |` 행을 만나면, 역컴파일러는 내부 버퍼(Buffer)를 활성화하여 동적 연산을 시작합니다.
+* **헤더 및 구분선 자동 생성:** 첫 번째 행의 `< >` 내부에서 키(Key) 이름들을 추출하여 마크다운 표의 첫 줄(`| 열1 | 열2 |`)을 구성하고, 그 즉시 다음 줄에 마크다운 필수 문법인 구분선(`| --- | --- |`)을 자동으로 연산하여 삽입합니다.
+* **값 바인딩:** 이후 들어오는 행들의 값(Value)만 순차적으로 추출하여 파이프(`|`) 라인 구조 안에 정렬시킴으로써 파괴되었던 표 레이아웃을 완벽하게 재빌드합니다.
+
+### ③ 복합 토큰 기호 해제 (순수 데이터 환원)
+결합되어 있던 인라인 기호들을 최종적으로 매핑 해제하여 인간이 읽을 수 있는 형태로 되돌립니다.
+* **구분자 해제:** `~(.*?)\|(.*?)~` 정규식을 통해 앞의 인자(alt)와 뒤의 인자(path)를 분리하여 `![alt](path)` 구조로 재조립합니다. URI 역시 `@`와 `|`를 해체하여 `[text](url)`로 복원합니다.
+* **타입 기호 완전 제거:** 값 주위에 붙어 있던 Boolean(`! !`), Date(`$ $`), Null(`/null/`), Identifier(`< >`) 등의 메타 표식들을 정규식 전역 매칭(`replace`)으로 완전히 제거하여 최종 마크다운 문서를 완성합니다.
+코드:<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aiwon v2.5 Sandbox Simulator</title>
+    <style>
+        :root {
+            --bg-main: #f2f4f6;
+            --bg-card: #ffffff;
+            --primary: #0064ff;
+            --primary-hover: #0051cc;
+            --text-main: #191f28;
+            --text-muted: #4e5968;
+            --border: #e5e8eb;
+            --radius: 18px;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body { 
+            margin: 0; 
+            background-color: var(--bg-main); 
+            color: var(--text-main); 
+            padding: 40px 20px; 
+        }
+
+        .container { 
+            max-width: 1100px; 
+            margin: 0 auto; 
+        }
+
+        header { 
+            padding: 20px 10px 40px 10px; 
+        }
+
+        header h1 { 
+            font-size: 32px; 
+            font-weight: 700; 
+            margin: 0 0 12px 0; 
+            letter-spacing: -0.5px;
+        }
+
+        header p { 
+            color: var(--text-muted); 
+            margin: 0; 
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .badge { 
+            background: #e8f3ff; 
+            color: var(--primary); 
+            padding: 4px 12px; 
+            border-radius: 8px; 
+            font-size: 13px; 
+            font-weight: 600;
+            display: inline-block;
+            margin-top: 8px;
+        }
+
+        .grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 24px; 
+            margin-bottom: 32px; 
+        }
+
+        @media (max-width: 850px) { 
+            .grid { grid-template-columns: 1fr; } 
+        }
+
+        .card { 
+            background: var(--bg-card); 
+            border-radius: var(--radius); 
+            padding: 28px; 
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+            display: flex; 
+            flex-direction: column; 
+        }
+
+        .card h2 { 
+            margin-top: 0; 
+            font-size: 19px; 
+            font-weight: 600;
+            color: var(--text-main); 
+            margin-bottom: 16px;
+        }
+
+        textarea { 
+            width: 100%; 
+            height: 420px; 
+            background: #fafafb; 
+            border: 1px solid var(--border); 
+            border-radius: 12px; 
+            color: var(--text-main); 
+            padding: 16px; 
+            font-family: 'Fira Code', Consolas, monospace; 
+            font-size: 14px; 
+            resize: none; 
+            line-height: 1.6; 
+            transition: all 0.2s ease;
+        }
+
+        textarea:focus { 
+            outline: none; 
+            border-color: var(--primary);
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(0, 100, 255, 0.15);
+        }
+
+        .btn-container { 
+            display: flex; 
+            gap: 12px; 
+            justify-content: center; 
+            margin-bottom: 40px;
+        }
+
+        button { 
+            color: white; 
+            border: none; 
+            padding: 16px 32px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            border-radius: 14px; 
+            cursor: pointer; 
+            transition: all 0.2s ease; 
+            background-color: var(--primary);
+        }
+
+        button:hover { 
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        button.btn-secondary {
+            background-color: #e8f3ff;
+            color: var(--primary);
+        }
+
+        button.btn-secondary:hover {
+            background-color: #d4e8ff;
+        }
+
+        .spec-box { 
+            background: var(--bg-card); 
+            padding: 28px; 
+            border-radius: var(--radius); 
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+        }
+
+        .spec-box h3 {
+            margin-top: 0;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .spec-box table { 
+            width: 100%; 
+            border-collapse: collapse; 
+        }
+
+        .spec-box th, .spec-box td { 
+            text-align: left; 
+            padding: 14px 10px; 
+            border-bottom: 1px solid var(--border); 
+            font-size: 14px; 
+        }
+
+        .spec-box th { 
+            color: var(--text-muted); 
+            font-weight: 600;
+        }
+        
+        .spec-box td code {
+            background: #eff1f3;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Aiwon v2.5 Sandbox</h1>
+        <p>엄격한 규칙 기반 구조 진단 알고리즘이 적용된 상태 보존형 컴파일러 시뮬레이터입니다.</p>
+        <div class="badge">Lossless Parser Activated</div>
+    </header>
+
+    <div class="grid">
+        <div class="card">
+            <h2>Human-Readable (Markdown)</h2>
+            <textarea id="mdInput" placeholder="이곳에 마크다운 문서를 입력하세요..."></textarea>
+        </div>
+        <div class="card">
+            <h2>AI-Readable (Aiwon v2.5)</h2>
+            <textarea id="aiownOutput" placeholder="컴파일된 Aiwon 결과가 여기에 출력됩니다."></textarea>
+        </div>
+    </div>
+
+    <div class="btn-container">
+        <button onclick="compileToAiwon()">Aiwon으로 컴파일 (MD ➔ AI)</button>
+        <button class="btn-secondary" onclick="depileToMarkdown()">마크다운으로 역컴파일 (AI ➔ MD)</button>
+    </div>
+
+    <div class="spec-box">
+        <h3>디버깅 완료된 핵심 스펙 매핑 구조</h3>
+        <table>
+            <tr><th>기호 패턴</th><th>대상 타입 (Type)</th><th>파서 검증 상태</th></tr>
+            <tr><td><code>&lt;값&gt;</code></td><td>Identifier</td><td>순수 일반 텍스트 및 개별 키 값 식별 완료</td></tr>
+            <tr><td><code>[값]</code></td><td>Code Block</td><td>멀티라인 펜스 덩어리 및 셀 내부 인라인 스크립트 분리 완료</td></tr>
+            <tr><td><code>@값@</code></td><td>URI</td><td>대체 텍스트 유실 없는 하이퍼링크 결합 변환 지원</td></tr>
+            <tr><td><code>~값~</code></td><td>Media</td><td>멀티미디어 소스 경로의 식별자 분리형 격리 완결</td></tr>
+            <tr><td><code>!값!</code></td><td>Boolean</td><td>대소문자 무관 정밀 매칭 및 데이터 정규화</td></tr>
+            <tr><td><code>$값$</code></td><td>Date</td><td>ISO 8601 타임스탬프 스크리닝 패턴 내장</td></tr>
+            <tr><td><code>/null/</code></td><td>Null</td><td>명시적 부재값 처리를 통한 배열 바인딩 붕괴 방지</td></tr>
+            <tr><td><code>%값%</code></td><td>Comment / Bold</td><td>인라인 엠퍼시스 강조 표식의 치환 충돌 제어</td></tr>
+        </table>
+    </div>
+</div>
+
+<script>
+    // 테스트용 시나리오 데이터 자동 로드
+    window.onload = function() {
+        document.getElementById('mdInput').value = `# 프로젝트: Cryptos\n# 버전: 3.6\n# 업데이트일자: 2026-06-30\n# 활성화여부: true\n# 비고: null\n\n// 이 라인은 일반 주석입니다. 컴파일 시 필터링됩니다.\n\n## 1. 개요\n**Cryptos**는 독특한 **암호 언어**입니다!\n\n\`\`\`\nfunction test() {\n    console.log("Hello Aiwon Engine"); // 코드 내부 주석 보존 검증\n}\n\`\`\`\n\n## 2. 데이터 테이블 (상태 보존 검증)\n| 알파벳 | 기호값 | 분류 |\n|---|---|---|\n| a | ♋︎ | 기본기호 |\n| b | ♌︎ | 기본기호 |\n\n## 3. 리소스 링크\n상세 정보는 [메인 레포지토리](https://github.com/7109jun/cryptos)에서 확인이 가능하며, 예시 파일은 ![로고 이미지](logo.png) 항목을 참조바랍니다.`;
+    };
+
+    function compileToAiwon() {
+        const input = document.getElementById('mdInput').value;
+        const lines = input.split('\n');
+        let output = [];
+        let inCodeBlock = false;
+        let codeContent = [];
+        let inTable = false;
+        let tableHeaders = [];
+        let tableRows = [];
+
+        // Greedy Matching 제어를 위한 경계 정규식 구성
+        const imgRegex = /!\[(.*?)\]\((.*?)\)/g;              
+        const urlRegex = /\[(.*?)\]\((https?:\/\/[^\s\)]+)\)/g; 
+        const boldRegex = /\*\*(.*?)\*\*/g;                     
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        const boolRegex = /^(true|false)$/i;
+        const nullRegex = /^(null)$/i;
+
+        function parseValue(val) {
+            if (boolRegex.test(val)) return `!${val}!`; 
+            if (dateRegex.test(val)) return `$${val}$`; 
+            if (nullRegex.test(val)) return `/null/`;   
+            if (val.includes('(') || val.includes('{') || val.includes(';') || val.includes('"') || val.includes('=')) return `[${val}]`;
+            if (!isNaN(val) && val.trim() !== '') return val; 
+            return `<${val}>`; 
+        }
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+
+            // 코드 블록 우선 처리 장치 (주석 필터링 오작동 회피)
+            if (line.trim().startsWith('```')) {
+                if (!inCodeBlock) {
+                    inCodeBlock = true;
+                    codeContent = [];
+                } else {
+                    inCodeBlock = false;
+                    output.push(`[\n${codeContent.join('\n')}\n]`);
+                }
+                continue;
+            }
+            if (inCodeBlock) {
+                codeContent.push(line);
+                continue;
+            }
+
+            if (line.trim().startsWith('//')) continue; 
+
+            // 구조적 데이터(표) 파싱
+            if (line.trim().startsWith('|')) {
+                if (/^\|?[\s\-:|]+\|?$/.test(line.trim())) continue; 
+                let cells = line.split('|').map(c => c.trim()).filter(c => c !== '');
+                if (!inTable) {
+                    inTable = true;
+                    tableHeaders = cells;
+                } else {
+                    tableRows.push(cells);
+                }
+                continue; 
+            } else {
+                if (inTable) {
+                    tableRows.forEach(row => {
+                        let rowTokens = [];
+                        tableHeaders.forEach((header, idx) => {
+                            let val = row[idx] ? row[idx] : '';
+                            rowTokens.push(`<${header}>=${parseValue(val)}`);
+                        });
+                        output.push(`| ${rowTokens.join(', ')} |`);
+                    });
+                    inTable = false; tableHeaders = []; tableRows = [];
+                }
+            }
+
+            // 프론트 매터 및 메타데이터 파싱 균형화
+            if (line.startsWith('#') && !line.startsWith('##') && line.includes(':')) {
+                let parts = line.substring(1).split(':');
+                let key = parts[0].trim();
+                let val = parts.slice(1).join(':').trim();
+                output.push(`# <${key}>=${parseValue(val)}`);
+                continue;
+            }
+
+            // 인라인 정규식 파이프라인 연산 안정화
+            line = line.replace(imgRegex, '~$1|$2~');
+            line = line.replace(urlRegex, '@$1|$2@');
+            line = line.replace(boldRegex, '%$1%');
+
+            if (line.trim() !== '' || lines[i] === '') {
+                output.push(line);
+            }
+        }
+
+        if (inTable) {
+            tableRows.forEach(row => {
+                let rowTokens = [];
+                tableHeaders.forEach((header, idx) => {
+                    let val = row[idx] ? row[idx] : '';
+                    rowTokens.push(`<${header}>=${parseValue(val)}`);
+                });
+                output.push(`| ${rowTokens.join(', ')} |`);
+            });
+        }
+
+        document.getElementById('aiownOutput').value = output.join('\n');
+    }
+
+    function depileToMarkdown() {
+        const input = document.getElementById('aiownOutput').value;
+        const lines = input.split('\n');
+        let output = [];
+        let inCodeBlock = false;
+        let tableBuffer = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+
+            if (line.trim() === '[') { inCodeBlock = true; output.push('```'); continue; }
+            if (line.trim() === ']') { inCodeBlock = false; output.push('```'); continue; }
+            if (inCodeBlock) { output.push(line); continue; }
+
+            if (line.startsWith('# <') && line.includes('=')) {
+                let match = line.match(/^# <([^>]+)>=(.*)$/);
+                if (match) {
+                    let key = match[1];
+                    let val = match[2].trim();
+                    val = val.replace(/[<>!$\/]/g, '').replace(/null/g, 'null');
+                    output.push(`# ${key}: ${val}`);
+                    continue;
+                }
+            }
+
+            // 유실 없는 표 복원 매핑 엔진
+            if (line.trim().startsWith('|') && line.trim().endsWith('|') && line.includes('>=')) {
+                let content = line.trim().slice(1, -1); 
+                let pairs = content.split(',').map(p => p.trim());
+                
+                if (tableBuffer.length === 0) {
+                    let headers = pairs.map(p => p.split('>=')[0].replace(/[<>]/g, ''));
+                    tableBuffer.push(`| ${headers.join(' | ')} |`);
+                    tableBuffer.push(`| ${headers.map(() => '---').join(' | ')} |`);
+                }
+                
+                let values = pairs.map(p => {
+                    let val = p.split('>=')[1];
+                    return val.replace(/[<>!$\/]/g, '').replace(/\[(.*?)\]/g, '$1');
+                });
+                tableBuffer.push(`| ${values.join(' | ')} |`);
+                continue;
+            } else {
+                if (tableBuffer.length > 0) {
+                    output.push(tableBuffer.join('\n'));
+                    tableBuffer = [];
+                }
+            }
+
+            // 결합 구조 해제 정규식 
+            line = line.replace(/~(.*?)\|(.*?)~/g, '![$1]($2)'); 
+            line = line.replace(/@(.*?)\|(.*?)@/g, '[$1]($2)'); 
+            line = line.replace(/%(.*?)%/g, '**$1**');          
+            
+            // 토큰 기호 이스케이프 해제 및 순수 데이터 환원
+            line = line.replace(/!(true|false)!/gi, '$1');
+            line = line.replace(/\$([0-9]{4}-[0-9]{2}-[0-9]{2})\$/g, '$1');
+            line = line.replace(/\/null\//g, 'null');
+            line = line.replace(/<(.*?)>/g, '$1'); 
+            line = line.replace(/\[(.*?)\]/g, '$1'); 
+
+            output.push(line);
+        }
+        
+        if (tableBuffer.length > 0) {
+            output.push(tableBuffer.join('\n'));
+        }
+        
+        document.getElementById('mdInput').value = output.join('\n');
+    }
+</script>
+</body>
+</html>
