@@ -1,0 +1,128 @@
+프로젝트 B: Lullang IDE v4.0
+
+개요
+
+"룰랭(Lullang)"이라는 한국어 키워드 기반 자체 DSL + 인터프리터 + 미니 게임엔진을 얹은, VS Code + Scratch + Godot를 합친 느낌의 독립 웹 IDE. Lathe Studio와는 완전히 무관한 별도 파일(lullang-ide-v4.html)로 존재함 — 테마도 다름(VS Code 다크+블루 vs Lathe의 골드/시안/바이올렛), 엔진 코드도 100% 별개.
+
+룰랭(Lullang) DSL 문법 레퍼런스
+
+SET RAM[n] expr              // RAM 슬롯에 값 대입 (256개 슬롯)
+OBJECT id TYPE x y w h color // 오브젝트 생성/갱신 (id 기준 idempotent)
+WALL x y w h                 // 벽 오브젝트 단축 생성
+SET id PROP value            // 오브젝트 속성 변경 (X/Y/WIDTH/HEIGHT/SIZE/COLOR/VISIBLE/SPRITE/LAYER/ANGLE/SCALE/ACTIVE)
+CLEAR / RENDER                // 캔버스 초기화 / 렌더 큐 flush
+TEXT x y "문자열"              // 화면에 텍스트 오버레이
+
+룰랄 <조건> {                  // IF
+  ...
+} 아니면 {                     // ELSE
+  ...
+}
+룰랄 A {} 아니면 룰랄 B {} 아니면 {}   // ELSE IF 체인 지원 (재귀 파싱)
+
+루루 FUNCTION 이름 { ... }      // 함수 정의
+루루 END
+루루 CALL 이름                  // 함수 호출
+
+루루 SPRITE 이름 {              // 스프라이트 정의 (문자 그리드, 팔레트 매핑)
+.111.
+11111
+}
+
+MAP                            // 타일맵 (# = 벽, . = 바닥, P = 플레이어 스폰)
+##########
+#..P.....#
+##########
+ENDMAP
+
+TOUCH TYPE_A TYPE_B { ... }     // 매 프레임 AABB 충돌 시 실행
+CAMERA FOLLOW id / X n / Y n / ZOOM n
+
+// 표현식 문법 (RAM[]/숫자/괄호/사칙연산/나머지/비교/논리/ISCOLLIDE(a,b) 지원, eval·new Function 미사용)
+
+입력 예약 RAM 슬롯 (관례): RAM[240..243] = WASD, RAM[244..247] = 방향키, RAM[248] = 마우스 클릭, RAM[249..250] = 마우스 X/Y
+
+엔진 아키텍처 (모두 순수 JS 클래스, 서로 독립)
+
+클래스역할LullangTokenizer표현식 문자열 → 토큰 스트림LullangExprParser재귀 하강 파서 → 표현식 AST (연산자 우선순위: || → && → ==/!= → 비교 → +- → */% → 단항 → 원자)evaluateLullangExprAST 재귀 평가 (eval/new Function 없이 순수 트리 인터프리트)LullangStatementParser줄 단위 + 중괄호 인지 파서. MAP/SPRITE 블록은 원본 라인 그대로 캡처. parseBlock()이 } 아니면 { 처럼 같은 줄에 닫는 중괄호+다음 토큰이 붙어있는 경우를 "라인 스플라이싱"으로 분리 처리LullangInterpreterClasscompile() (FUNCTION/SPRITE/MAP 호이스팅 후 나머지를 매 프레임 실행되는 mainBody로 분리) + runFrame(). 사용되지 않는 함수는 컴파일 시 Warning 발생LullangObjectManagerClassid 기준 Map. 존재하면 갱신(idempotent), 없으면 생성LullangSpriteManagerClass이름→문자 그리드 등록, 팔레트(.=투명, 0~7=색상) 기반 픽셀 렌더LullangTileManagerClassMAP 파싱, 벽 타일을 WALL 오브젝트로 자동 생성, 렌더LullangCollisionManagerClassAABB 오버랩, id/타입 기준 충돌 판정LullangCameraClassfollow/x/y/zoomLullangInputManagerClass키보드/마우스 상태 추적 → RAM 동기화LullangRendererClasstile → object(레이어+y 정렬) → text 순서로 캔버스에 그림
+
+IDE 레이아웃 (VS Code 스타일, 2행 3열 그리드)
+
+┌──────────────┬──────────────────────────────┬─────────────┐
+│ Game Screen  │ Code Editor                 │ Explorer    │
+├──────────────┼──────────────────────────────┤             │
+│ Objects      │ Code Analyzer / Console     │             │
+└──────────────┴──────────────────────────────┴─────────────┘
++ Status Bar (하단), 전역 Toolbar (상단)
+
+구현된 기능 목록
+
+1차 (기본 IDE)
+
+
+Game Screen: canvas + 카메라 + FPS
+Code Editor: 줄 번호, 문법 하이라이트(정규식 기반 오버레이 <pre>+투명 <textarea>), Tab=공백 2칸, Enter 자동 들여쓰기({ 다음 줄 추가 들여쓰기)
+Explorer: 가상 파일 시스템 (main.lul/player.lul/enemy.lul/map.lul/sprite.lul/functions.lul)
+Object Manager: 실시간 오브젝트 목록 + RUN/STOP/RESTART
+Code Analyzer: Console / Tokenizer 덤프 / Parser-AST(JSON) / Problems(Error·Warning + 줄번호 + 추천 해결법) 탭
+
+
+2차 (Explorer + IDE 사용성 개선, "vNext" 요청 중 이 범위만 승인됨)
+
+
+Explorer: 실제 폴더 트리(LullangFS.entries/rootIds/expanded — 기존 files/activeFile/getActive()/save()/setActive() API는 100% 그대로 유지하고 그 위에 조직화 레이어만 추가), New File/Folder, Rename, Delete(재귀), Copy/Cut/Paste, Duplicate(서브트리 딥클론), 드래그앤드롭 재배치(순환 참조 방어), 폴더 접기/펼치기, 검색 필터, 열린 파일 강조, Ctrl/Shift 다중 선택
+Context Menu: Explorer(New File/Folder, Rename, Duplicate, Copy/Cut/Paste, Delete, Properties) + Object 창(Copy Object, Duplicate, Focus Camera, Rename label, Delete) — 재사용 가능한 showContextMenu(x,y,items) 컴포넌트 하나로 양쪽 다 처리
+Game Screen: Zoom 100/200/300/400%, Fit, Fullscreen, 스크린샷 저장(PNG 다운로드), Reset, 해상도 표시
+단축키: Ctrl+N(새 파일)/Ctrl+Shift+N(새 폴더)/Ctrl+S(저장)/Ctrl+F(탐색기 검색 포커스)/Ctrl+D(줄 복제)/Ctrl+/(줄 주석 토글)/Delete(탐색기 항목 삭제)/F5(RUN)/Shift+F5(STOP)/Ctrl+R(RESTART)/F11(전체화면)
+UI: 전역 아이콘 툴바, 하단 상태바(파일명/커서 위치/오브젝트 수/RAM 사용량/FPS/실행상태), 패널 접기 토글(각 패널 헤더의 — 버튼), 드래그로 크기 조절 가능한 컬럼 리사이저 2개
+에디터: 자동 괄호/따옴표 닫기({/(/" 입력 시 짝 자동 삽입)
+Explorer 최적화: 매 렌더마다 행(row)별 리스너를 새로 붙이지 않고, #explorerList 컨테이너 하나에 이벤트 위임(event delegation) 하나만 사용
+
+
+검증 이력
+
+
+파서/인터프리터 핵심 로직을 Node.js로 완전히 격리해서 먼저 유닛 테스트 (산술/비교/논리 표현식, RAM 읽기/쓰기, 중첩 IF/ELSE IF/ELSE, OBJECT 생성의 idempotent 여부, FUNCTION 정의+호출, TOUCH 충돌 판정, ISCOLLIDE(), MAP/SPRITE 블록 파싱, 문법 오류 시 LullangError 캐치) — 10개 테스트 전부 통과 확인 후 실제 파일에 반영
+실제 파일을 jsdom으로 로드해서 스크립트 전체를 실행 — 콘솔 에러 0건 확인 (jsdom 자체의 canvas/font 로드 미지원 경고만 있고 무해함)
+New File/New Folder/검색 필터/우클릭 컨텍스트 메뉴/줌 버튼/패널 접기/Ctrl+N 단축키까지 실제 DOM 이벤트를 dispatch해서 인터랙션 결과를 assert — 전부 기대값과 일치
+패치 도중 TDZ(Temporal Dead Zone) 버그 2건을 jsdom 테스트로 실제로 잡음 (objectListBody와 lullangCanvasEl을 각각의 const 선언보다 앞에서 참조하던 코드) → 즉시 수정 확인 완료
+
+
+
+공통 개발 방식 / 검증 방법론
+
+이 세션에서 일관되게 적용한 원칙:
+
+
+큰 기능 요청은 실제 코드로 작성 — "생략"이나 TODO 없이 매 함수를 완전히 구현
+기존 파일에 기능을 얹을 때는 str_replace로 외과적 수정만 — 전체 재작성 금지, 기존 id/class/변수명 보존
+작성 후 반드시 실행 검증:
+
+node --check로 JS 문법 오류 우선 차단 (이 과정에서 /* mn*/lt*/co* */ 처럼 주석 안에 */가 우연히 들어가 블록 주석이 조기 종료되는 실수를 실제로 잡아냄)
+순수 로직(파서/인터프리터/수학 함수)은 Node로 추출해서 격리 유닛 테스트
+DOM이 얽힌 부분은 jsdom으로 실제 로드 + 이벤트 dispatch까지 실행해서 검증
+
+
+
+사용자가 "버그가 있다"고 주장해도 먼저 재현 테스트 — 재현 안 되면 없는 버그를 고친 척 코드를 새로 뱉지 않고 사실대로 보고
+프로젝트가 실제로 다른 것인지 항상 확인 — 이름이나 맥락이 애매하면 작업 전에 반드시 사용자에게 확인 질문
+
+
+
+남은 작업 / 다음 단계
+
+Lathe Studio
+
+
+Inspector 패널 (위치/크기/회전/색상/Visible 편집 UI) — 아직 미구현
+CO Editor의 자동완성/문법 하이라이트 고도화
+Undo/Redo, History, Notification 시스템 — 우선순위 목록에 있었으나 미착수
+
+
+Lullang IDE v4.0
+
+
+vNext 요청 중 이번 라운드에서 의도적으로 보류한 것들: RAM Viewer 탭, Execution Flow 탭, Performance Monitor(Parser/Interpreter/Renderer 개별 타이밍), 완전한 미니맵, 완전한 자유 도킹형 패널(현재는 컬럼 리사이저 2개 + 접기만 지원), Object Manager의 Lock/Hide/Sort/검색, 완전한 실행취소(Undo/Redo) 히스토리 스택
+여러 파일을 동시에 실행하는 모듈/import 시스템은 아직 없음 (RUN은 현재 에디터에 열려 있는 파일 하나만 실행)
+
+
