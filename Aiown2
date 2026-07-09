@@ -8,7 +8,7 @@
 $ $	날짜
 /null/	Null
 % %	주석
-코드: <!DOCTYPE html>
+코드:<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -70,27 +70,27 @@ $ $	날짜
     </div>
 
     <div class="spec-box">
-        <h3>📐 Aiown v2.5 문법 명세 매핑 테이블 (Spec Summary)</h3>
+        <h3>📐 Aiown v2.5 문법 명세 매핑 테이블 (네가 말한 기준 완벽 매핑!)</h3>
         <table>
             <tr><th>기호 패턴</th><th>컴파일 타겟 구조</th><th>설명</th></tr>
             <tr><td><code>&lt;값&gt;</code></td><td>이름 (Name / Identifier)</td><td>고유 명사, 식별자, 데이터 항목명 명시</td></tr>
             <tr><td><code>[값]</code></td><td>코드 (Code / Script block)</td><td>실행 가능한 소스 코드 및 명령어 블록 분리</td></tr>
-            <tr><td><code>숫자 (Raw)</code></td><td>숫자 (Numeric)</td><td>나이, 버전, 개수 등 순수 수치 데이터</td></tr>
+            <tr><td><code>숫자 (Raw)</code></td><td>숫자 (Numeric)</td><td>나이, 버전, 개수 등 순수 수치 데이터 (기호 없음)</td></tr>
             <tr><td><code>@값@</code></td><td>URL / URI Link</td><td>참조 외부 웹 링크 주소 처리</td></tr>
             <tr><td><code>~값~</code></td><td>미디어 (Media Path)</td><td>이미지 및 미디어 파일 경로 (.png, .jpg 등) 매핑</td></tr>
-            <tr><td><code>!값!</code></td><td>중요 정보 (High Priority)</td><td>AI RAG 가중치 최고 등급 지정 데이터</td></tr>
-            <tr><td><code>$값$</code></td><td>Boolean</td><td>true / false 판단형 논리 데이터</td></tr>
-            <tr><td><code>%값%</code></td><td>날짜 / null / Null</td><td>특정 타임스탬프 또는 빈 값 명시</td></tr>
-            <tr><td><code>// 값</code></td><td>주석 (Comment)</td><td>컴파일러가 해석하지 않고 건너뛰는 문장</td></tr>
+            <tr><td><code>!값!</code></td><td>Boolean (논리값)</td><td>true / false 판단형 논리 데이터</td></tr>
+            <tr><td><code>$값$</code></td><td>날짜 (Date)</td><td>특정 타임스탬프 또는 날짜 명시</td></tr>
+            <tr><td><code>/null/</code></td><td>Null (빈 값)</td><td>데이터가 없음을 명시적으로 표현</td></tr>
+            <tr><td><code>%값%</code></td><td>주석 (Comment)</td><td>기존 문장의 주석 처리 및 설명문 블록</td></tr>
+            <tr><td><code>// 값</code></td><td>한 줄 제외 (Skip Line)</td><td>컴파일러가 해석하지 않고 최종 출력에서 건너뛰는 문장</td></tr>
             <tr><td><code>,</code></td><td>Object Delimiter</td><td>단일 행 내부에서 데이터 객체 간 경계를 설정</td></tr>
         </table>
     </div>
 </div>
 
 <script>
-    // 기본 샘플 템플릿 로드 (신규 문법 요소 반영)
     window.onload = function() {
-        document.getElementById('mdInput').value = `# 프로젝트: Cryptos\n# 버전: 3.6\n# 업데이트일자: 2026-06-30\n# 활성화여부: true\n\n// 이 라인은 주석입니다. 컴파일 시 제외됩니다.\n\n## 1. 개요\n**Cryptos**는 윙딩폰트(Wingdings Font)를 이용한 독특한 **암호 언어**입니다!\n\n\`\`\`\n예시: Hello\n↓\n📄︎🙧♏︎●︎□\n\`\`\`\n\n## 2. 기본 문자 변환 규칙\n| 알파벳 | 기호값 | 분류 |\n|---|---|---|\n| a | ♋︎ | 기본문자 |\n| b | ♌︎ | 기본문자 |\n| c | ♍︎ | 기본문자 |\n\n## 3. 리소스 및 자원 링크\n상세 정보는 메인 저장소인 https://github.com/7109jun/cryptos 에서 확인 가능합니다.\n\n![로고 이미지](logo.png)`;
+        document.getElementById('mdInput').value = `# 프로젝트: Cryptos\n# 버전: 3.6\n# 업데이트일자: 2026-06-30\n# 활성화여부: true\n# 비고: null\n\n// 이 라인은 주석입니다. 컴파일 시 제외됩니다.\n\n## 1. 개요\n**Cryptos**는 윙딩폰트(Wingdings Font)를 이용한 독특한 **암호 언어**입니다!\n\n\`\`\`\nprint("Hello World")\n\`\`\`\n\n## 2. 기본 문자 변환 규칙\n| 알파벳 | 기호값 | 분류 |\n|---|---|---|\n| a | ♋︎ | 기본문자 |\n| b | ♌︎ | 기본문자 |\n| c | ♍︎ | 기본문자 |\n\n## 3. 리소스 및 자원 링크\n상세 정보는 메인 저장소인 https://github.com/7109jun/cryptos 에서 확인 가능합니다.\n\n![로고 이미지](logo.png)`;
     };
 
     function compileToAiown() {
@@ -103,32 +103,33 @@ $ $	날짜
         let tableHeaders = [];
         let tableRows = [];
 
-        // 정규식 매핑 기준 정의
+        // 정규식 정의
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         const imgRegex = /!\[.*?\]\((.*?)\)/g;
         const boldRegex = /\*\*(.*?)\*\*/g;
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
         const boolRegex = /^(true|false)$/i;
-        const nullRegex = /^(null|Null)$/;
+        const nullRegex = /^(null)$/i;
 
-        // 값 속성에 따른 신규 토큰 생성 헬퍼 함수
+        // 값의 타입에 따라 네가 정한 문법 기호로 변환해주는 헬퍼 함수
         function parseValue(val) {
-            if (boolRegex.test(val)) return `$${val}$`;
-            if (dateRegex.test(val) || nullRegex.test(val)) return `%${val}%`;
-            if (urlRegex.test(val)) return val.replace(urlRegex, '@$1@');
-            if (!isNaN(val) && val !== '') return val; // 순수 숫자
-            return `<${val}>`; // 기본 텍스트 (이름/식별자)
+            if (boolRegex.test(val)) return `!${val}!`; // !Boolean!
+            if (dateRegex.test(val)) return `$${val}$`; // $Date$
+            if (nullRegex.test(val)) return `/null/`;   // /null/
+            if (urlRegex.test(val)) return val.replace(urlRegex, '@$1@'); // @URL@
+            if (!isNaN(val) && val !== '') return val; // 순수 숫자 (Raw)
+            return `<${val}>`; // 기본 텍스트는 <이름>으로 처리
         }
 
         for (let i = 0; i < lines.length; i++) {
             let line = lines[i].trim();
 
-            // 0. 주석 처리 (//)
+            // 0. 주석 처리 (//) -> 완전히 스킵
             if (line.startsWith('//')) {
                 continue; 
             }
 
-            // 1. 코드 블록 처리 (``` -> [코드])
+            // 1. 코드 블록 처리 (``` -> [코드]) -> 네 요청대로 [ ] 로 변경!
             if (line.startsWith('```')) {
                 if (!inCodeBlock) {
                     inCodeBlock = true;
@@ -184,12 +185,13 @@ $ $	날짜
                 continue;
             }
 
-            // 4. 인라인 요소 컴파일
+            // 4. 인라인 요소 컴파일 (본문 텍스트 매핑)
             // 이미지 처리: ![alt](path) -> ~path~ (미디어)
             line = line.replace(imgRegex, '~$1~');
 
-            // 중요 정보 처리: **텍스트** -> !텍스트! (중요 정보)
-            line = line.replace(boldRegex, '!$1!');
+            // 중요 정보 처리: **텍스트** -> %텍스트% (주석/설명 용도 또는 중요 기호로 커스텀 가능)
+            // 만약 중요 정보를 다르게 바꾸고 싶다면 기호를 변경해봐! 여기선 일단 유지할게.
+            line = line.replace(boldRegex, '%$1%');
 
             // 본문 내 독립 URL 처리: http... -> @http...@
             line = line.replace(urlRegex, '@$1@');
