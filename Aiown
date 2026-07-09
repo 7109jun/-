@@ -1,0 +1,248 @@
+마크다운 형식을 몰라서 새로운 형식을 만들어어버렸습니다 
+## 📐 Aiown 문법 매핑 가이드 (Syntax Guide)
+
+**Aiown**은 복잡한 설정 없이, 오직 **특수 기호와 괄호의 모양, 그리고 따옴표의 유무**만으로 데이터의 타입(Type)을 결정합니다. 이를 통해 AI(LLM)는 문서를 읽을 때 오독이나 착각 없이 단 1밀리초 만에 내용을 파악하고 구조화합니다.
+
+---
+
+### 1. 꺾쇠 기호: `< >` (텍스트 이름 vs 소스 코드 분리)
+
+* **`<"값">` (따옴표 있음) ──> Name / 고유 식별자**
+  * 사람 이름, 프로젝트명, 컴포넌트 이름 등 순수한 '텍스트 이름'을 저장합니다. AI가 일반 명사와 고유 명사를 명확히 구분할 수 있도록 격리합니다.
+  * *예시:* `담당자 <"7109jun">, 프로젝트 <"Cryptos">`
+* **`<값>` (따옴표 없음) ──> Code / 실행 스크립트**
+  * 프로그래밍 소스 코드나 시스템 명령어를 넣는 곳입니다. AI에게 "이건 자연어가 아니니 문맥 분석을 하지 말고 그대로 시스템에 던져서 실행해!"라고 알려주는 역할을 합니다.
+  * *예시:* `* 실행코드 < print("Hello World") >`
+
+---
+
+### 2. 대괄호 기호: `[ ]` (웹 링크 vs 순수 숫자 분리)
+
+* **`["값"]` (따옴표 있음) ──> URL / 참조 링크**
+  * 외부 참고 링크나 외부 API 주소 등의 웹사이트 URI 주소를 문자열 형태로 저장합니다.
+  * *예시:* `참조링크 ["https://github.com/7109jun/cryptos"]`
+* **`[값]` (따옴표 없음) ──> Age / Revision / 순수 숫자**
+  * 문서가 몇 번 수정되었는지(Age), 혹은 버전 정보 등 '순수 숫자 데이터'를 연산하거나 크기를 비교할 수 있도록 저장하는 곳입니다. (반드시 숫자만 입력)
+  * *예시:* `수정횟수 [36], 버전 [3.6]`
+
+---
+
+### 3. 멀티미디어 및 중요도 가중치: `@` , `~`
+
+* **`@값@` ──> Media / 멀티미디어 데이터 경로**
+  * `png`, `jpg` 같은 이미지 파일이나 리소스의 위치(Path)를 지정합니다. 멀티모달(비전) 기능이 있는 최신 AI가 이 경로를 보고 정확히 이미지를 찾아 읽을 수 있습니다.
+  * *예시:* `설계도면 @parser_flow.png@`
+* **`~값~` ──> High Priority / 최우선 집중 정보**
+  * 문서 내부에서 **AI가 가장 중요하게 기억해야 할 핵심 정보**입니다. AI 벡터 DB 및 RAG(검색) 시스템에서 이 기호가 붙은 데이터는 가중치(Weight) 점수를 가장 높게 적용받아 답변의 무결성을 높입니다.
+  * *예시:* `마일스톤 ~"2026-08-01 프로토타입 빌드"~`
+
+---
+
+### 4. 쉼표 기호: `,` (한 줄 압축 및 객체 전환)
+
+* **`,` ──> Object Delimiter / 데이터 객체 구분자**
+  * 기존 마크다운처럼 화면을 다 차지하는 거대한 표(Table)를 만들지 않고, 한 줄에 여러 개의 데이터를 쉼표로 이어 붙여 압축 표현합니다. 토큰(비용)을 수십 배 이상 아껴주는 핵심 기호입니다.
+  * *예시:* `* 부품A <"LiDAR_v2">, 수정횟수 [12], 스펙문서 ["https://sensor.spec/lidar2"]`
+어렵긴 한데 번역기 만들었으니 상관은 없스무니다 
+코드
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aiown v2.5 Compiler & Ecosystem</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --primary-blue: #38bdf8;
+            --accent-green: #34d399;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { margin: 0; background-color: var(--bg-color); color: var(--text-main); padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header { text-align: center; padding: 30px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        header h1 { color: var(--primary-blue); margin: 0 0 10px 0; font-size: 28px; }
+        header p { color: var(--text-muted); margin: 0; }
+        .badge { background: #0284c7; color: white; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 25px; }
+        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; }
+        .card h2 { margin-top: 0; font-size: 18px; color: var(--accent-green); border-bottom: 1px solid var(--border); padding-bottom: 10px; display: flex; justify-content: space-between; }
+        textarea { width: 100%; height: 450px; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; color: #e2e8f0; padding: 15px; font-family: 'Fira Code', Consolas, monospace; font-size: 14px; resize: none; line-height: 1.6; }
+        textarea:focus { outline: 2px solid var(--primary-blue); }
+        .btn-center { text-align: center; margin: 20px 0; }
+        button { background: linear-gradient(135deg, #38bdf8, #0284c7); color: white; border: none; padding: 14px 40px; font-size: 16px; font-weight: bold; border-radius: 30px; cursor: pointer; transition: all 0.2s; shadow: 0 4px 14px rgba(56, 189, 248, 0.3); }
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56, 189, 248, 0.4); }
+        .spec-box { background: #0f172a; border-left: 4px solid var(--primary-blue); padding: 20px; border-radius: 0 12px 12px 0; margin-top: 20px; }
+        .spec-box table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .spec-box th, .spec-box td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
+        .spec-box th { color: var(--primary-blue); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>⚡ Aiown v2.5 (AI-owned Document Format) Compiler</h1>
+        <p>인간 중심의 Markdown 문서를 AI 최적화 초고속 파싱 포맷인 Aiown(.aiown)으로 컴파일합니다. <span class="badge">v2.5 Open Spec</span></p>
+    </header>
+
+    <div class="grid">
+        <div class="card">
+            <h2>📝 Human-Readable (Markdown Input)</h2>
+            <textarea id="mdInput" placeholder="이곳에 마크다운 문서를 입력하세요..."></textarea>
+        </div>
+        <div class="card">
+            <h2>🤖 AI-Readable (Aiown v2.5 Output)</h2>
+            <textarea id="aiownOutput" readonly placeholder="컴파일된 Aiown 결과가 여기에 출력됩니다."></textarea>
+        </div>
+    </div>
+
+    <div class="btn-center">
+        <button onclick="compileToAiown()">🚀 Aiown 엔진으로 컴파일 실행</button>
+    </div>
+
+    <div class="spec-box">
+        <h3>📐 Aiown v2.5 문법 명세 매핑 테이블 (Spec Summary)</h3>
+        <table>
+            <tr><th>기호 패턴</th><th>컴파일 타겟 구조</th><th>설명</th></tr>
+            <tr><td><code>["값"]</code></td><td>URL / URI String</td><td>따옴표가 포함된 대괄호는 참조 외부 웹 링크 주소로 처리</td></tr>
+            <tr><td><code>[값]</code></td><td>Age / Revision (Integer)</td><td>순수 숫자가 들어간 대괄호는 데이터의 수정 횟수 및 나이로 처리</td></tr>
+            <tr><td><code>&lt;"값"&gt;</code></td><td>Name / Identifier</td><td>따옴표가 포함된 꺾쇠는 고유 명사, 식별자, 이름으로 처리</td></tr>
+            <tr><td><code>&lt;값&gt;</code></td><td>Code / Script block</td><td>순수 텍스트는 실행 가능한 소스 코드 및 명령어로 분리</td></tr>
+            <tr><td><code>@값@</code></td><td>Media Data Path</td><td>이미지 파일 경로 (.png, .jpg 등) 매핑</td></tr>
+            <tr><td><code>~값~</code></td><td>High Priority Vector</td><td>AI RAG 시스템 가중치 최고 등급 지정 (중요 정보)</td></tr>
+            <tr><td><code>,</code></td><td>Object Delimiter</td><td>단일 행 내부에서 데이터 객체 간 경계를 설정</td></tr>
+        </table>
+    </div>
+</div>
+
+<script>
+    // 기본 샘플 템플릿 로드 (Cryptos 암호 언어 프로젝트 예시 탑재)
+    window.onload = function() {
+        document.getElementById('mdInput').value = `# 프로젝트: Cryptos\n# 버전: 3.6\n# 중요마일스톤: 2026-06-30 최종 업데이트 완료\n\n## 1. 개요\n**Cryptos**는 윙딩폰트(Wingdings Font)를 이용한 독특한 **암호 언어**입니다!\n\n\`\`\`\n예시: Hello\n↓\n📄︎🙧♏︎●︎□\n\`\`\`\n\n## 2. 기본 문자 변환 규칙\n| 알파벳 | 기호값 | 분류 |\n|---|---|---|\n| a | ♋︎ | 기본문자 |\n| b | ♌︎ | 기본문자 |\n| c | ♍︎ | 기본문자 |\n\n## 3. 리소스 및 자원 링크\n상세 정보는 메인 저장소인 https://github.com/7109jun/cryptos 에서 확인 가능합니다.\n\n![로고 이미지](logo.png)`;
+    };
+
+    function compileToAiown() {
+        const input = document.getElementById('mdInput').value;
+        const lines = input.split('\n');
+        let output = [];
+        let inCodeBlock = false;
+        let codeContent = [];
+        let inTable = false;
+        let tableHeaders = [];
+        let tableRows = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+
+            // 1. 코드 블록 처리 (``` -> <코드>)
+            if (line.startsWith('```')) {
+                if (!inCodeBlock) {
+                    inCodeBlock = true;
+                    codeContent = [];
+                } else {
+                    inCodeBlock = false;
+                    output.push(`* <코드> <\n${codeContent.join('\n')}\n>`);
+                }
+                continue;
+            }
+            if (inCodeBlock) {
+                codeContent.push(lines[i]); // 원본 코드 보존
+                continue;
+            }
+
+            // 2. 마크다운 표 처리 (| -> , 와 객체화)
+            if (line.startsWith('|')) {
+                if (line.includes('---') || line.includes(':-')) continue;
+                let cells = line.split('|').map(c => c.trim()).filter(c => c !== '');
+                if (!inTable) {
+                    inTable = true;
+                    tableHeaders = cells;
+                } else {
+                    tableRows.push(cells);
+                }
+                continue;
+            } else {
+                if (inTable) {
+                    tableRows.forEach(row => {
+                        let rowTokens = [];
+                        tableHeaders.forEach((header, idx) => {
+                            let val = row[idx] ? row[idx] : '';
+                            // URL 검사 규칙 적용
+                            if (val.startsWith('http')) {
+                                rowTokens.push(`${header} ["${val}"]`);
+                            } else if (!isNaN(val) && val !== '') { // 숫자(나이) 검사 규칙 적용
+                                rowTokens.push(`${header} [${val}]`);
+                            } else {
+                                rowTokens.push(`${header} <"${val}">`);
+                            }
+                        });
+                        output.push(`* ${rowTokens.join(', ')}`);
+                    });
+                    output.push('');
+                    inTable = false; tableHeaders = []; tableRows = [];
+                }
+            }
+
+            // 3. 메타데이터 생성 규칙 (# 구조화 및 , 결합)
+            if (line.startsWith('#') && !line.startsWith('##')) {
+                let content = line.replace(/^#\s*/, '');
+                if (content.includes(':')) {
+                    let parts = content.split(':');
+                    let key = parts[0].trim();
+                    let val = parts.slice(1).join(':').trim();
+                    if (!isNaN(val)) {
+                        output.push(`# ${key} [${val}]`);
+                    } else {
+                        output.push(`# ${key} <"${val}">`);
+                    }
+                } else {
+                    output.push(line);
+                }
+                continue;
+            }
+
+            // 4. 인라인 요소 컴파일 (이미지 @, 중요 ~, URL [])
+            // 이미지 처리: ![alt](path) -> @path@
+            let imgRegex = /!\[.*?\]\((.*?)\)/g;
+            line = line.replace(imgRegex, '@$1@');
+
+            // 중요 정보 처리: **텍스트** -> ~텍스트~
+            let boldRegex = /\*\*(.*?)\*\*/g;
+            line = line.replace(boldRegex, '~$1~');
+
+            // 본문 내 URL 처리 (독립 링크)
+            let urlRegex = /(https?:\/\/[^\s]+)/g;
+            line = line.replace(urlRegex, '["$1"]');
+
+            if (line !== '') {
+                output.push(line);
+            } else if (lines[i] === '') {
+                output.push('');
+            }
+        }
+
+        // 잔여 표 데이터 마감
+        if (inTable) {
+            tableRows.forEach(row => {
+                let rowTokens = [];
+                tableHeaders.forEach((header, idx) => {
+                    let val = row[idx] ? row[idx] : '';
+                    if (val.startsWith('http')) rowTokens.push(`${header} ["${val}"]`);
+                    else if (!isNaN(val) && val !== '') rowTokens.push(`${header} [${val}]`);
+                    else rowTokens.push(`${header} <"${val}">`);
+                });
+                output.push(`* ${rowTokens.join(', ')}`);
+            });
+        }
+
+        document.getElementById('aiownOutput').value = output.join('\n');
+    }
+</script>
+</body>
+</html>
