@@ -13,7 +13,7 @@ $ $	날짜
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aiown v2.5 Compiler & Ecosystem</title>
+    <title>Aiwon v2.5 Compiler & Depiler Ecosystem</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -37,9 +37,11 @@ $ $	날짜
         .card h2 { margin-top: 0; font-size: 18px; color: var(--accent-green); border-bottom: 1px solid var(--border); padding-bottom: 10px; display: flex; justify-content: space-between; }
         textarea { width: 100%; height: 450px; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; color: #e2e8f0; padding: 15px; font-family: 'Fira Code', Consolas, monospace; font-size: 14px; resize: none; line-height: 1.6; }
         textarea:focus { outline: 2px solid var(--primary-blue); }
-        .btn-center { text-align: center; margin: 20px 0; }
-        button { background: linear-gradient(135deg, #38bdf8, #0284c7); color: white; border: none; padding: 14px 40px; font-size: 16px; font-weight: bold; border-radius: 30px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 14px rgba(56, 189, 248, 0.3); }
-        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56, 189, 248, 0.4); }
+        .btn-center { text-align: center; margin: 20px 0; display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;}
+        button { color: white; border: none; padding: 14px 40px; font-size: 16px; font-weight: bold; border-radius: 30px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
+        .btn-compile { background: linear-gradient(135deg, #38bdf8, #0284c7); box-shadow: 0 4px 14px rgba(56, 189, 248, 0.3); }
+        .btn-depile { background: linear-gradient(135deg, #34d399, #059669); box-shadow: 0 4px 14px rgba(52, 211, 153, 0.3); }
+        button:hover { transform: translateY(-2px); }
         .spec-box { background: #0f172a; border-left: 4px solid var(--primary-blue); padding: 20px; border-radius: 0 12px 12px 0; margin-top: 20px; }
         .spec-box table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .spec-box th, .spec-box td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
@@ -50,27 +52,28 @@ $ $	날짜
 
 <div class="container">
     <header>
-        <h1>⚡ Aiown v2.5 (AI-owned Document Format) Compiler</h1>
-        <p>인간 중심의 Markdown 문서를 AI 최적화 초고속 파싱 포맷인 Aiown(.aiown)으로 컴파일합니다. <span class="badge">v2.5 Open Spec</span></p>
+        <h1>⚡ Aiwon v2.5 (AI-owned Document Format) Ecosystem</h1>
+        <p>인간 중심의 Markdown과 AI 최적화 포맷 Aiwon(.aiown)을 양방향으로 실시간 변환합니다. <span class="badge">v2.5 Open Spec</span></p>
     </header>
 
     <div class="grid">
         <div class="card">
-            <h2>📝 Human-Readable (Markdown Input)</h2>
+            <h2>📝 Human-Readable (Markdown)</h2>
             <textarea id="mdInput" placeholder="이곳에 마크다운 문서를 입력하세요..."></textarea>
         </div>
         <div class="card">
-            <h2>🤖 AI-Readable (Aiown v2.5 Output)</h2>
-            <textarea id="aiownOutput" readonly placeholder="컴파일된 Aiown 결과가 여기에 출력됩니다."></textarea>
+            <h2>🤖 AI-Readable (Aiwon v2.5)</h2>
+            <textarea id="aiownOutput" placeholder="컴파일된 Aiwon 결과가 여기에 출력됩니다."></textarea>
         </div>
     </div>
 
     <div class="btn-center">
-        <button onclick="compileToAiown()">🚀 Aiown 엔진으로 컴파일 실행</button>
+        <button class="btn-compile" onclick="compileToAiwon()">🚀 Aiwon으로 컴파일 (MD ➔ AI)</button>
+        <button class="btn-depile" onclick="depileToMarkdown()">🔄 마크다운으로 역컴파일 (AI ➔ MD)</button>
     </div>
 
     <div class="spec-box">
-        <h3>📐 Aiown v2.5 문법 명세 매핑 테이블 (네가 말한 기준 완벽 매핑!)</h3>
+        <h3>📐 Aiwon v2.5 문법 명세 매핑 테이블</h3>
         <table>
             <tr><th>기호 패턴</th><th>컴파일 타겟 구조</th><th>설명</th></tr>
             <tr><td><code>&lt;값&gt;</code></td><td>이름 (Name / Identifier)</td><td>고유 명사, 식별자, 데이터 항목명 명시</td></tr>
@@ -81,7 +84,7 @@ $ $	날짜
             <tr><td><code>!값!</code></td><td>Boolean (논리값)</td><td>true / false 판단형 논리 데이터</td></tr>
             <tr><td><code>$값$</code></td><td>날짜 (Date)</td><td>특정 타임스탬프 또는 날짜 명시</td></tr>
             <tr><td><code>/null/</code></td><td>Null (빈 값)</td><td>데이터가 없음을 명시적으로 표현</td></tr>
-            <tr><td><code>%값%</code></td><td>주석 (Comment)</td><td>기존 문장의 주석 처리 및 설명문 블록</td></tr>
+            <tr><td><code>%값%</code></td><td>주석/강조 (Comment/Bold)</td><td>기존 문장의 주석 처리 및 설명문 블록</td></tr>
             <tr><td><code>// 값</code></td><td>한 줄 제외 (Skip Line)</td><td>컴파일러가 해석하지 않고 최종 출력에서 건너뛰는 문장</td></tr>
             <tr><td><code>,</code></td><td>Object Delimiter</td><td>단일 행 내부에서 데이터 객체 간 경계를 설정</td></tr>
         </table>
@@ -93,7 +96,10 @@ $ $	날짜
         document.getElementById('mdInput').value = `# 프로젝트: Cryptos\n# 버전: 3.6\n# 업데이트일자: 2026-06-30\n# 활성화여부: true\n# 비고: null\n\n// 이 라인은 주석입니다. 컴파일 시 제외됩니다.\n\n## 1. 개요\n**Cryptos**는 윙딩폰트(Wingdings Font)를 이용한 독특한 **암호 언어**입니다!\n\n\`\`\`\nprint("Hello World")\n\`\`\`\n\n## 2. 기본 문자 변환 규칙\n| 알파벳 | 기호값 | 분류 |\n|---|---|---|\n| a | ♋︎ | 기본문자 |\n| b | ♌︎ | 기본문자 |\n| c | ♍︎ | 기본문자 |\n\n## 3. 리소스 및 자원 링크\n상세 정보는 메인 저장소인 https://github.com/7109jun/cryptos 에서 확인 가능합니다.\n\n![로고 이미지](logo.png)`;
     };
 
-    function compileToAiown() {
+    // ==========================================
+    // 1. 마크다운 ➔ Aiwon 컴파일러 (Compiler)
+    // ==========================================
+    function compileToAiwon() {
         const input = document.getElementById('mdInput').value;
         const lines = input.split('\n');
         let output = [];
@@ -103,40 +109,35 @@ $ $	날짜
         let tableHeaders = [];
         let tableRows = [];
 
-        // 정규식 정의
-        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const urlRegex = /(https?:\/\/[^\s]+)/; 
+        const urlRegexGlobal = /(https?:\/\/[^\s]+)/g; 
         const imgRegex = /!\[.*?\]\((.*?)\)/g;
         const boldRegex = /\*\*(.*?)\*\*/g;
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
         const boolRegex = /^(true|false)$/i;
         const nullRegex = /^(null)$/i;
 
-        // 값의 타입에 따라 네가 정한 문법 기호로 변환해주는 헬퍼 함수
         function parseValue(val) {
-            if (boolRegex.test(val)) return `!${val}!`; // !Boolean!
-            if (dateRegex.test(val)) return `$${val}$`; // $Date$
-            if (nullRegex.test(val)) return `/null/`;   // /null/
-            if (urlRegex.test(val)) return val.replace(urlRegex, '@$1@'); // @URL@
-            if (!isNaN(val) && val !== '') return val; // 순수 숫자 (Raw)
-            return `<${val}>`; // 기본 텍스트는 <이름>으로 처리
+            if (boolRegex.test(val)) return `!${val}!`; 
+            if (dateRegex.test(val)) return `$${val}$`; 
+            if (nullRegex.test(val)) return `/null/`;   
+            if (val.match(urlRegex)) return val.replace(urlRegexGlobal, '@$1@'); 
+            if (!isNaN(val) && val !== '') return val; 
+            return `<${val}>`; 
         }
 
         for (let i = 0; i < lines.length; i++) {
             let line = lines[i].trim();
 
-            // 0. 주석 처리 (//) -> 완전히 스킵
-            if (line.startsWith('//')) {
-                continue; 
-            }
+            if (line.startsWith('//')) continue; 
 
-            // 1. 코드 블록 처리 (``` -> [코드]) -> 네 요청대로 [ ] 로 변경!
             if (line.startsWith('```')) {
                 if (!inCodeBlock) {
                     inCodeBlock = true;
                     codeContent = [];
                 } else {
                     inCodeBlock = false;
-                    output.push(`* [ \n${codeContent.join('\n')}\n]`);
+                    output.push(`[\n${codeContent.join('\n')}\n]`);
                 }
                 continue;
             }
@@ -145,9 +146,8 @@ $ $	날짜
                 continue;
             }
 
-            // 2. 마크다운 표 처리
             if (line.startsWith('|')) {
-                if (line.includes('---') || line.includes(':-')) continue;
+                if (/^\|?[\s\-:|]+\|?$/.test(line)) continue; 
                 let cells = line.split('|').map(c => c.trim()).filter(c => c !== '');
                 if (!inTable) {
                     inTable = true;
@@ -155,46 +155,38 @@ $ $	날짜
                 } else {
                     tableRows.push(cells);
                 }
-                continue;
+                continue; 
             } else {
                 if (inTable) {
                     tableRows.forEach(row => {
                         let rowTokens = [];
                         tableHeaders.forEach((header, idx) => {
                             let val = row[idx] ? row[idx] : '';
-                            rowTokens.push(`<${header}> ${parseValue(val)}`);
+                            rowTokens.push(`<${header}>=${parseValue(val)}`); 
                         });
-                        output.push(`* ${rowTokens.join(', ')}`);
+                        output.push(rowTokens.join(',')); 
                     });
                     output.push('');
                     inTable = false; tableHeaders = []; tableRows = [];
                 }
             }
 
-            // 3. 메타데이터 생성 규칙 (# 구조화)
             if (line.startsWith('#') && !line.startsWith('##')) {
                 let content = line.replace(/^#\s*/, '');
                 if (content.includes(':')) {
                     let parts = content.split(':');
                     let key = parts[0].trim();
                     let val = parts.slice(1).join(':').trim();
-                    output.push(`# <${key}> ${parseValue(val)}`);
+                    output.push(`# <${key}>=${parseValue(val)}`);
                 } else {
                     output.push(line);
                 }
                 continue;
             }
 
-            // 4. 인라인 요소 컴파일 (본문 텍스트 매핑)
-            // 이미지 처리: ![alt](path) -> ~path~ (미디어)
             line = line.replace(imgRegex, '~$1~');
-
-            // 중요 정보 처리: **텍스트** -> %텍스트% (주석/설명 용도 또는 중요 기호로 커스텀 가능)
-            // 만약 중요 정보를 다르게 바꾸고 싶다면 기호를 변경해봐! 여기선 일단 유지할게.
             line = line.replace(boldRegex, '%$1%');
-
-            // 본문 내 독립 URL 처리: http... -> @http...@
-            line = line.replace(urlRegex, '@$1@');
+            line = line.replace(urlRegexGlobal, '@$1@');
 
             if (line !== '') {
                 output.push(line);
@@ -203,19 +195,79 @@ $ $	날짜
             }
         }
 
-        // 잔여 표 데이터 마감
         if (inTable) {
             tableRows.forEach(row => {
                 let rowTokens = [];
                 tableHeaders.forEach((header, idx) => {
                     let val = row[idx] ? row[idx] : '';
-                    rowTokens.push(`<${header}> ${parseValue(val)}`);
+                    rowTokens.push(`<${header}>=${parseValue(val)}`);
                 });
-                output.push(`* ${rowTokens.join(', ')}`);
+                output.push(rowTokens.join(','));
             });
         }
 
         document.getElementById('aiownOutput').value = output.join('\n');
+    }
+
+    // ==========================================
+    // 2. Aiwon ➔ 마크다운 역컴파일러 (Depiler)
+    // ==========================================
+    function depileToMarkdown() {
+        const input = document.getElementById('aiownOutput').value;
+        const lines = input.split('\n');
+        let output = [];
+        let inCodeBlock = false;
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+
+            // 1. 코드 블록 복원 ([ -> ```)
+            if (line.trim() === '[') { inCodeBlock = true; output.push('```'); continue; }
+            if (line.trim() === ']') { inCodeBlock = false; output.push('```'); continue; }
+            if (inCodeBlock) { output.push(line); continue; }
+
+            // 2. 메타데이터 복원 (# <key>=<value> -> # key: value)
+            if (line.startsWith('# <')) {
+                line = line.replace(/^# <([^>]+)>=(.*)$/, (match, key, val) => {
+                    val = val.replace(/^<(.*)>$/, '$1'); // 값의 <> 제거
+                    return `# ${key}: ${val}`;
+                });
+                output.push(line);
+                continue;
+            }
+
+            // 3. 객체/표 행 복원 (<key>=<val>, <key2>=<val2> -> 마크다운 리스트)
+            if (line.includes('>=') && line.includes('<')) {
+                let items = [];
+                const regex = /<([^>]+)>=(.*?)(?=, <|$)/g;
+                let match;
+                while ((match = regex.exec(line)) !== null) {
+                    let key = match[1];
+                    let val = match[2].trim();
+                    // 값이 < >로 감싸져 있으면 제거 (Plain Text 복원)
+                    if (val.startsWith('<') && val.endsWith('>')) {
+                        val = val.substring(1, val.length - 1);
+                    }
+                    items.push(`- **${key}**: ${val}`);
+                }
+                if (items.length > 0) {
+                    output.push(items.join('\n'));
+                    continue;
+                }
+            }
+
+            // 4. 인라인 요소 복원
+            line = line.replace(/~(.*?)~/g, '![$1]($1)');      // 미디어
+            line = line.replace(/@(.*?)@/g, '[$1]($1)');      // URL
+            line = line.replace(/%(.*?)%/g, '**$1**');        // 강조/주석
+            line = line.replace(/<(.*?)>/g, '$1');            // 식별자
+            line = line.replace(/!(true|false)!/gi, '$1');    // 불리언
+            line = line.replace(/\$([0-9]{4}-[0-9]{2}-[0-9]{2})\$/g, '$1'); // 날짜
+            line = line.replace(/\/null\//g, 'null');         // Null
+
+            output.push(line);
+        }
+        document.getElementById('mdInput').value = output.join('\n');
     }
 </script>
 </body>
