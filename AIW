@@ -1,0 +1,272 @@
+AIW는 Aiwon에 파생된 버전이라 보면 돼고 그냥 마크다운으로 정리해드리겠스무니다
+# AIW (Artificial Intelligence Web-document) Specification
+
+AIW는 마크다운(Markdown)의 높은 가독성과 JSON의 구조적 데이터 표현 능력을 융합한 **차세대 데이터 교환 및 문서 표현 포맷**입니다. 인간과 AI가 모두 가장 직관적으로 읽고 쓸 수 있도록 설계되었습니다.
+
+---
+
+## 1. 문서 구조 및 그룹 정의 (`!`)
+
+문서의 전체 제목이나 큰 데이터의 그룹(객체 범위)을 지정합니다. 느낌표(`!`)의 개수로 크기와 계층(Level)을 조절합니다.
+
+* **`!(그룹명)!`** : 기본 데이터 그룹 / 섹션 제목
+* **`!(그룹명)!!`** : 상위 데이터 그룹 / 대제목 (더 크고 중요한 영역)
+
+---
+
+## 2. 식별자 및 데이터 타입 정의
+
+기존 JSON처럼 모든 데이터를 문자열로 통일하지 않고, 기호 자체로 데이터의 속성을 즉시 부여합니다.
+
+### 🪪 식별자 / 키 (Key)
+* **`&(키값)&`** : 객체의 속성명(Key)이나 고유 ID, 변수명을 정의합니다.
+
+### 📝 문자열 및 수식 (String & Equation)
+* **`@("텍스트")@`** : 명확한 문자열(String) 데이터를 의미합니다.
+* **`@(수식)@`** : AI와 컴퓨터가 계산하거나 렌더링해야 하는 수학 공식/방정식을 의미합니다.
+
+### 📅 날짜 (Date)
+* **`+(년),(월),(일)+`** : 날짜 객체로 자동 변환되는 데이터입니다.
+  * *예시:* `+(2026),(07),(10)+`
+
+### 🖼️ 이미지 (Image)
+* **`;(경로 또는 URL);`** : 문서에 포함될 이미지의 주소를 나타냅니다.
+
+### ❓ 상태 및 논리값 (Boolean & Null)
+* **`[1]` / `[0]`** : 불리언(Boolean) 값을 나타냅니다. `[1]`은 **True**, `[0]`은 **False**입니다.
+* **`$(0)$` / `$(1)$`** : Null 상태를 체크합니다. `$(0)$`은 **Null(빈 값)**, `$(1)$`은 **값 존재(Not Null)**를 뜻합니다.
+* **`=(1)=` / `=(0)=`** : True(`1`)와 False(`0`)를 나타내는 시스템 제어용 스위치입니다.
+
+---
+
+## 3. 구조적 데이터 표현 (표 및 리스트)
+
+### 📊 행렬형 표 (Table)
+가장 직관적인 형태로 행과 열의 데이터를 선언합니다.
+1. **`<표 이름>`** 으로 표의 시작을 알립니다.
+2. 아랫줄에 **`&` 기호의 개수**로 열(Column)의 개수를 정의합니다.
+3. 다음 줄부터 공백(스페이스/탭)과 줄바꿈을 기준으로 데이터를 나열합니다. 숫자와 글자 모두 입력 가능합니다.
+
+```markdown
+<분기별 매출>
+& & &
+분기 매출 성장률
+1분기 500 2%
+2분기 800 3%
+
+번역기 코드 JSON을 AIW 형식으로 변환 :<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>JSON to AIW Converter</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        header p {
+            color: #7f8c8d;
+        }
+        .converter-box {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .panel {
+            flex: 1;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .panel h2 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: #34495e;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+        }
+        textarea {
+            width: 100%;
+            height: 450px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            padding: 12px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            resize: none;
+            background-color: #fafafa;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #3498db;
+            background-color: #fff;
+        }
+        .btn-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #27ae60;
+        }
+        .error-msg {
+            color: #e74c3c;
+            margin-top: 10px;
+            font-weight: bold;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>🔄 JSON to AIW Converter</h1>
+        <p>기존 JSON 데이터를 기호 기반의 고가독성 AIW 포맷으로 손쉽게 변환하세요.</p>
+    </header>
+
+    <div class="btn-container">
+        <button onclick="convertJSONtoAIW()">AIW 포맷으로 변환하기 🚀</button>
+        <div id="error" class="error-msg"></div>
+    </div>
+
+    <div class="converter-box">
+        <div class="panel">
+            <h2>INPUT (JSON)</h2>
+            <textarea id="json-input" placeholder='{\n  "project": "AIW",\n  "version": 1.0,\n  "isActive": true,\n  "tags": ["JSON", "Markdown"]\n}'></textarea>
+        </div>
+        
+        <div class="panel">
+            <h2>OUTPUT (AIW)</h2>
+            <textarea id="aiw-output" readonly placeholder="# 변환된 AIW 결과가 여기에 표시됩니다."></textarea>
+        </div>
+    </div>
+</div>
+
+<script>
+function convertJSONtoAIW() {
+    const jsonInput = document.getElementById('json-input').value.trim();
+    const aiwOutput = document.getElementById('aiw-output');
+    const errorDiv = document.getElementById('error');
+    
+    errorDiv.style.display = 'none';
+    aiwOutput.value = '';
+
+    if (!jsonInput) {
+        errorDiv.innerText = 'JSON 데이터를 입력해주세요.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    try {
+        const parsedJson = JSON.parse(jsonInput);
+        let result = "# AIW 포맷으로 자동 변환된 문서입니다.\n";
+        
+        // 데이터 구조 파싱 엔진 작동
+        result += parseElement(parsedJson, 1, "");
+        
+        aiwOutput.value = result.trim();
+    } catch (e) {
+        errorDiv.innerText = '올바른 JSON 형식이 아닙니다: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+function parseElement(obj, level, keyName) {
+    let output = "";
+    const indent = "  ".repeat(level - 1);
+
+    // 1. Null 처리
+    if (obj === null) {
+        return `${indent}${keyName}$(0)$\n`;
+    }
+
+    // 2. 배열(Array) 처리
+    if (Array.isArray(obj)) {
+        if (keyName) {
+            output += `${indent}${keyName}\n`;
+        }
+        obj.forEach(item => {
+            if (typeof item === 'object' && item !== null) {
+                output += `${indent}- (\n${parseElement(item, level + 1, "")}${indent})\n`;
+            } else {
+                output += `${indent}- ${formatValue(item)}\n`;
+            }
+        });
+        return output;
+    }
+
+    // 3. 객체(Object) 처리
+    if (typeof obj === 'object') {
+        if (keyName) {
+            const exclamation = "!".repeat(Math.min(level, 2));
+            const cleanKey = keyName.replace(/[&:]/g, "").trim();
+            output += `\n${indent}!(${cleanKey})${exclamation}\n\n`;
+        }
+        
+        for (const key in obj) {
+            const formattedKey = `&(${key})&: `;
+            output += parseElement(obj[key], level + 1, formattedKey);
+        }
+        return output;
+    }
+
+    // 4. 일반 원시 값 처리
+    return `${indent}${keyName}${formatValue(obj)}\n`;
+}
+
+function formatValue(val) {
+    if (typeof val === 'string') {
+        // 날짜 형식 판단 (YYYY-MM-DD 패턴 파악)
+        const dateRegex = /^\d{4}-\d{2}-\d{2}/;
+        if (dateRegex.test(val)) {
+            const parts = val.split(/[-T:]/);
+            return `+(${parts[0]}),(${parts[1]}),(${parts[2]})+`;
+        }
+        // 이미지 및 링크 형식 판단
+        if (val.match(/\.(jpeg|jpg|gif|png|svg)$/i) || val.startsWith('http')) {
+            if (val.includes('img') || val.match(/\.(jpeg|jpg|gif|png|svg)$/i)) {
+                return `;(${val});`;
+            }
+        }
+        return `@("${val}")@`;
+    }
+    if (typeof val === 'boolean') {
+        return val ? "[1]" : "[0]";
+    }
+    return val;
+}
+</script>
+
+</body>
+</html>
