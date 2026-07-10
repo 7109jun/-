@@ -83,6 +83,7 @@ document.getElementById('json-input').value = JSON.stringify({
     "emptyState": null
   },
   "keywords": ["Markdown", "JSON", "AI-Optimized"],
+  "mathEquation": "2x + 5 = 11",
   "matrixDataset": [
     { "Target": "AI Engine", "Tokens": 250, "Ratio": "1.2%" },
     { "Target": "Human", "Tokens": 800, "Ratio": "3.5%" }
@@ -132,9 +133,7 @@ function processNode(node, depth, incomingKey) {
             segment += `${padding}${tableHeaders.join(" ")}\n`;
             
             node.forEach(row => {
-                const values = tableHeaders.map(h => {
-                    return resolveValueType(row[h], true);
-                });
+                const values = tableHeaders.map(h => resolveValueType(row[h], true));
                 segment += `${padding}${values.join(" ")}\n`;
             });
             return segment;
@@ -159,8 +158,7 @@ function processNode(node, depth, incomingKey) {
         }
         
         for (const childKey in node) {
-            const normalizedKey = `&(${childKey})&: `;
-            segment += processNode(node[childKey], depth + 1, normalizedKey);
+            segment += processNode(node[childKey], depth + 1, `&(${childKey})&: `);
         }
         return segment;
     }
@@ -187,11 +185,19 @@ function resolveValueType(primitive, isTable = false) {
             return `@("${primitive}")@`;
         }
         
+        if (/^[0-9.+\-*/=()\sA-Za-z]+$/.test(primitive) && !/[가-힣]/.test(primitive)) {
+            return `@(${primitive.trim()})@`;
+        }
+        
         if (isTable && !primitive.includes(" ")) {
             return primitive;
         }
 
         return `@("${primitive.replace(/"/g, '\\"')}")@`;
+    }
+    
+    if (typeof primitive === 'number') {
+        return `@(${primitive})@`;
     }
     
     if (typeof primitive === 'boolean') {
