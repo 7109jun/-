@@ -1,0 +1,202 @@
+AIW 편집기 만들었습니다
+기능들
+알수없는 글자 흰색
+맞는 글자 초록색
+맞지 않은 문자 빨강
+Tab 눌러 자동완성 기능(아직 좋지 않음)
+코드:
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>AIW Code Editor v2.5</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            padding: 30px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; height: 90vh; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #21262d; padding-bottom: 15px; }
+        header h1 { font-size: 1.5rem; color: #58a6ff; font-weight: 600; }
+        .toolbar { display: flex; gap: 8px; }
+        .btn {
+            background-color: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn:hover { background-color: #30363d; border-color: #8b949e; }
+        .btn-primary { background-color: #238636; border-color: #2ea44f; color: #fff; }
+        .btn-primary:hover { background-color: #2ea44f; }
+        .editor-box { display: flex; gap: 20px; flex: 1; min-height: 0; }
+        .panel { flex: 1; display: flex; flex-direction: column; }
+        .panel h2 { font-size: 0.85rem; color: #8b949e; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+        textarea {
+            width: 100%;
+            flex: 1;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 14px;
+            padding: 18px;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            resize: none;
+            background-color: #161b22;
+            color: #e6edf3;
+            line-height: 1.6;
+        }
+        textarea:focus { outline: none; border-color: #58a6ff; }
+        .preview {
+            width: 100%;
+            flex: 1;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 14px;
+            padding: 18px;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            background-color: #0d1117;
+            color: #fff;
+            overflow-y: auto;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        .err { color: #ff5555; text-decoration: underline; font-weight: bold; }
+        .ok { color: #50fa7b; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>AIW Code Editor v2.5</h1>
+        <div class="toolbar">
+            <button class="btn" onclick="insertTag('&amp;(', ')&amp;')">Key (&amp;)</button>
+            <button class="btn" onclick="insertTag('@(\"', '\")@')">String (@"")</button>
+            <button class="btn" onclick="insertTag('@(', ')@')">Equation (@)</button>
+            <button class="btn" onclick="insertTag('+(', ')+')">Date (+)</button>
+            <button class="btn btn-primary" onclick="copyAIW()">Copy Document</button>
+        </div>
+    </header>
+
+    <div class="editor-box">
+        <div class="panel">
+            <h2>AIW Authoring</h2>
+            <textarea id="aiw-editor" oninput="renderPreview()" placeholder="작성 중 Tab을 누르면 문법 기호 자동 완성..."></textarea>
+        </div>
+        <div class="panel">
+            <h2>Syntax Validation View</h2>
+            <div id="aiw-preview" class="preview"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const editor = document.getElementById('aiw-editor');
+const preview = document.getElementById('aiw-preview');
+
+editor.value = `!(AIW Specification Group)!!\n\n&(valid_key)&: @("Correct String Data")@\n&(math_expr)&: @(2x + 5 = 11)@\n&(timestamp)&: +(2026),(07),(10)+\n\n&(broken_syntax): @("this is wrong)@\n깨진 기호나 틀린 문법은 빨간색, 정상은 초록색, 본문은 하얀색 스무니다`;
+
+editor.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = this.selectionStart;
+        const text = this.value;
+        const leftChunk = text.substring(0, start);
+        
+        const tokens = [
+            { pattern: /&$/, insert: '()&', offset: 1 },
+            { pattern: /&\($/, insert: ')&', offset: 0 },
+            { pattern: /@$/, insert: '("")@', offset: 2 },
+            { pattern: /@\($/, insert: ')"@', offset: 1 },
+            { pattern: /\+$/, insert: '(),(),()+', offset: 1 },
+            { pattern: /!$/, insert: '()!', offset: 1 }
+        ];
+
+        for (const token of tokens) {
+            if (token.pattern.test(leftChunk)) {
+                this.value = leftChunk + token.insert + text.substring(start);
+                this.selectionStart = this.selectionEnd = start + token.offset;
+                renderPreview();
+                return;
+            }
+        }
+
+        this.value = leftChunk + "    " + text.substring(start);
+        this.selectionStart = this.selectionEnd = start + 4;
+        renderPreview();
+    }
+});
+
+function insertTag(startTag, endTag) {
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const text = editor.value;
+    const selected = text.substring(start, end);
+    editor.value = text.substring(0, start) + startTag + selected + endTag + text.substring(end);
+    editor.focus();
+    editor.selectionStart = start + startTag.length;
+    editor.selectionEnd = start + startTag.length + selected.length;
+    renderPreview();
+}
+
+function renderPreview() {
+    let text = editor.value;
+    let safe = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    
+    let regexes = [
+        { regex: /(!\(.*?\)!+)/g, type: 'ok' },
+        { regex: /(&amp;\(.*?\Parenthesis*?\)&amp;)/g, type: 'ok' },
+        { regex: /(&amp;\(.*?\Parenthesis*?\s*[^)]*)/g, type: 'err' },
+        { regex: /(@\(\".*?\"\)@)/g, type: 'ok' },
+        { regex: /(@\(\".*?[^\"]\)@)/g, type: 'err' },
+        { regex: /(@\(.*?\Parenthesis*?\)@)/g, type: 'ok' },
+        { regex: /(\+\([^)]*\),\([^)]*\),\([^)]*\)\+)/g, type: 'ok' },
+        { regex: /(\+\[^+]*\+)/g, type: 'err' },
+        { regex: /(\[1\]|\[0\]|\$\(0\)\$|\$\(1\)\$|=\(1\)=|=\(0\)=)/g, type: 'ok' }
+    ];
+
+    let segments = [{ text: safe, type: 'plain' }];
+
+    regexes.forEach(rule => {
+        let nextSegments = [];
+        segments.forEach(seg => {
+            if (seg.type !== 'plain') {
+                nextSegments.push(seg);
+                return;
+            }
+            let parts = seg.text.split(rule.regex);
+            parts.forEach((part, i) => {
+                if (!part) return;
+                if (i % 2 === 1) {
+                    nextSegments.push({ text: part, type: rule.type });
+                } else {
+                    nextSegments.push({ text: part, type: 'plain' });
+                }
+            });
+        });
+        segments = nextSegments;
+    });
+
+    preview.innerHTML = segments.map(seg => {
+        if (seg.type === 'ok') return `<span class="ok">${seg.text}</span>`;
+        if (seg.type === 'err') return `<span class="err">${seg.text}</span>`;
+        return seg.text;
+    }).join('');
+}
+
+function copyAIW() {
+    navigator.clipboard.writeText(editor.value);
+}
+
+renderPreview();
+</script>
+
+</body>
+</html>
