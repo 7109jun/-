@@ -75,7 +75,6 @@
 </div>
 
 <script>
-// 구조적 예시 데이터 (원작자의 모든 스펙 케이스 포함)
 document.getElementById('json-input').value = JSON.stringify({
   "documentTitle": "AIW Specification Demo",
   "systemConfig": {
@@ -85,7 +84,7 @@ document.getElementById('json-input').value = JSON.stringify({
   },
   "keywords": ["Markdown", "JSON", "AI-Optimized"],
   "matrixDataset": [
-    { "Target": "AI", "Tokens": 250, "Ratio": "1.2%" },
+    { "Target": "AI Engine", "Tokens": 250, "Ratio": "1.2%" },
     { "Target": "Human", "Tokens": 800, "Ratio": "3.5%" }
   ]
 }, null, 2);
@@ -119,14 +118,11 @@ function processNode(node, depth, incomingKey) {
     let segment = "";
     const padding = "  ".repeat(depth - 1);
 
-    // Case 1: Null 데이터 원자적 처리
     if (node === null) {
         return `${padding}${incomingKey}$(0)$\n`;
     }
 
-    // Case 2: 배열(Array) 데이터 정밀 처리
     if (Array.isArray(node)) {
-        // 객체 배열일 경우 AIW <표> 스펙으로 강제 정렬
         if (node.length > 0 && typeof node[0] === 'object' && node[0] !== null) {
             const tableId = incomingKey ? incomingKey.replace(/[&:\s()]/g, "") : "DatasetTable";
             segment += `\n${padding}<${tableId}>\n`;
@@ -137,18 +133,13 @@ function processNode(node, depth, incomingKey) {
             
             node.forEach(row => {
                 const values = tableHeaders.map(h => {
-                    const cell = row[h];
-                    if (typeof cell === 'string') {
-                        return cell.includes(" ") ? `@("${cell.replace(/"/g, '\\"')}")@` : cell;
-                    }
-                    return cell === null ? "$(0)$" : cell;
+                    return resolveValueType(row[h], true);
                 });
                 segment += `${padding}${values.join(" ")}\n`;
             });
             return segment;
         }
 
-        // 일반 원시 배열 처리
         if (incomingKey) segment += `${padding}${incomingKey}\n`;
         node.forEach(element => {
             if (typeof element === 'object' && element !== null) {
@@ -160,12 +151,11 @@ function processNode(node, depth, incomingKey) {
         return segment;
     }
 
-    // Case 3: 객체(Object) 중첩 구조 재귀 처리
     if (typeof node === 'object') {
         if (incomingKey) {
-            const levelIndicator = "!".repeat(depth);
+            const exclamation = "!".repeat(Math.min(depth, 2));
             const pureKey = incomingKey.replace(/[&:\s()]/g, "");
-            segment += `\n${padding}!(${pureKey})${levelIndicator}\n\n`;
+            segment += `\n${padding}!(${pureKey})${exclamation}\n\n`;
         }
         
         for (const childKey in node) {
@@ -175,13 +165,13 @@ function processNode(node, depth, incomingKey) {
         return segment;
     }
 
-    // Case 4: 일반 단일 리터럴 값 처리
     return `${padding}${incomingKey}${resolveValueType(node)}\n`;
 }
 
-function resolveValueType(primitive) {
+function resolveValueType(primitive, isTable = false) {
+    if (primitive === null) return "$(0)$";
+
     if (typeof primitive === 'string') {
-        // ISO-8601 및 타임스탬프 표준화 검증
         const dateMatch = primitive.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2}))?/);
         if (dateMatch) {
             let stamp = `+(${dateMatch[1]}),(${dateMatch[2]}),(${dateMatch[3]})+`;
@@ -189,12 +179,18 @@ function resolveValueType(primitive) {
             return stamp;
         }
         
-        // 이미지 및 네트워크 자원 주소 검증
-        if (primitive.match(/\.(jpeg|jpg|gif|png|svg)$/i) || primitive.startsWith('http')) {
+        if (primitive.match(/\.(jpeg|jpg|gif|png|svg)$/i)) {
             return `;(${primitive});`;
         }
         
-        // 데이터 정합성을 위한 문자열 이스케이프 안전 격리
+        if (primitive.startsWith('http')) {
+            return `@("${primitive}")@`;
+        }
+        
+        if (isTable && !primitive.includes(" ")) {
+            return primitive;
+        }
+
         return `@("${primitive.replace(/"/g, '\\"')}")@`;
     }
     
