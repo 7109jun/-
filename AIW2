@@ -1,0 +1,210 @@
+안녕하스무니다? 한번 천제적으로 디자인도 바꾼 HTML을 제작했습니다
+자세한 내용은 AIW 1편을 보시길 코드: 
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>AIW Core Engine v2.1</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #fafafa;
+            color: #111111;
+            padding: 40px 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header { text-align: center; margin-bottom: 30px; }
+        header h1 { font-size: 1.8rem; font-weight: 600; margin-bottom: 6px; }
+        header p { color: #666; font-size: 0.95rem; }
+        .converter-box { display: flex; gap: 20px; margin-bottom: 20px; }
+        .panel { flex: 1; display: flex; flex-direction: column; }
+        .panel h2 { font-size: 0.9rem; font-weight: 600; color: #444; text-transform: uppercase; margin-bottom: 10px; }
+        textarea {
+            width: 100%;
+            height: 500px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 13px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: none;
+            background-color: #fff;
+            line-height: 1.5;
+        }
+        textarea:focus { outline: none; border-color: #000; }
+        .btn-container { text-align: center; margin-bottom: 20px; }
+        button {
+            background-color: #111;
+            color: #fff;
+            border: none;
+            padding: 12px 36px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background-color: #333; }
+        .error-msg { color: #ff3b30; margin-top: 10px; font-weight: 600; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>AIW Core Engine</h1>
+        <p>Optimized for Large Language Model Frameworks (Claude / GPT)</p>
+    </header>
+
+    <div class="btn-container">
+        <button onclick="executeTransformation()">Transform Data</button>
+        <div id="error" class="error-msg"></div>
+    </div>
+
+    <div class="converter-box">
+        <div class="panel">
+            <h2>Source (JSON)</h2>
+            <textarea id="json-input" placeholder="Paste target JSON dataset..."></textarea>
+        </div>
+        
+        <div class="panel">
+            <h2>Target (AIW Spec)</h2>
+            <textarea id="aiw-output" readonly placeholder="Output stream..."></textarea>
+        </div>
+    </div>
+</div>
+
+<script>
+// 구조적 예시 데이터 (원작자의 모든 스펙 케이스 포함)
+document.getElementById('json-input').value = JSON.stringify({
+  "documentTitle": "AIW Specification Demo",
+  "systemConfig": {
+    "engineVersion": 2.1,
+    "initialized": true,
+    "emptyState": null
+  },
+  "keywords": ["Markdown", "JSON", "AI-Optimized"],
+  "matrixDataset": [
+    { "Target": "AI", "Tokens": 250, "Ratio": "1.2%" },
+    { "Target": "Human", "Tokens": 800, "Ratio": "3.5%" }
+  ]
+}, null, 2);
+
+function executeTransformation() {
+    const jsonInput = document.getElementById('json-input').value.trim();
+    const aiwOutput = document.getElementById('aiw-output');
+    const errorDiv = document.getElementById('error');
+    
+    errorDiv.style.display = 'none';
+    aiwOutput.value = '';
+
+    if (!jsonInput) {
+        errorDiv.innerText = 'Error: Input area is empty.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    try {
+        const parsedJson = JSON.parse(jsonInput);
+        let result = "# AIW 포맷으로 자동 변환된 문서입니다.\n";
+        result += processNode(parsedJson, 1, "");
+        aiwOutput.value = result.trim();
+    } catch (e) {
+        errorDiv.innerText = 'Invalid JSON Structure: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+function processNode(node, depth, incomingKey) {
+    let segment = "";
+    const padding = "  ".repeat(depth - 1);
+
+    // Case 1: Null 데이터 원자적 처리
+    if (node === null) {
+        return `${padding}${incomingKey}$(0)$\n`;
+    }
+
+    // Case 2: 배열(Array) 데이터 정밀 처리
+    if (Array.isArray(node)) {
+        // 객체 배열일 경우 AIW <표> 스펙으로 강제 정렬
+        if (node.length > 0 && typeof node[0] === 'object' && node[0] !== null) {
+            const tableId = incomingKey ? incomingKey.replace(/[&:\s()]/g, "") : "DatasetTable";
+            segment += `\n${padding}<${tableId}>\n`;
+            
+            const tableHeaders = Object.keys(node[0]);
+            segment += `${padding}${"& ".repeat(tableHeaders.length).trim()}\n`;
+            segment += `${padding}${tableHeaders.join(" ")}\n`;
+            
+            node.forEach(row => {
+                const values = tableHeaders.map(h => {
+                    const cell = row[h];
+                    if (typeof cell === 'string') {
+                        return cell.includes(" ") ? `@("${cell.replace(/"/g, '\\"')}")@` : cell;
+                    }
+                    return cell === null ? "$(0)$" : cell;
+                });
+                segment += `${padding}${values.join(" ")}\n`;
+            });
+            return segment;
+        }
+
+        // 일반 원시 배열 처리
+        if (incomingKey) segment += `${padding}${incomingKey}\n`;
+        node.forEach(element => {
+            if (typeof element === 'object' && element !== null) {
+                segment += `${padding}- (\n${processNode(element, depth + 1, "")}${padding})\n`;
+            } else {
+                segment += `${padding}- ${resolveValueType(element)}\n`;
+            }
+        });
+        return segment;
+    }
+
+    // Case 3: 객체(Object) 중첩 구조 재귀 처리
+    if (typeof node === 'object') {
+        if (incomingKey) {
+            const levelIndicator = "!".repeat(depth);
+            const pureKey = incomingKey.replace(/[&:\s()]/g, "");
+            segment += `\n${padding}!(${pureKey})${levelIndicator}\n\n`;
+        }
+        
+        for (const childKey in node) {
+            const normalizedKey = `&(${childKey})&: `;
+            segment += processNode(node[childKey], depth + 1, normalizedKey);
+        }
+        return segment;
+    }
+
+    // Case 4: 일반 단일 리터럴 값 처리
+    return `${padding}${incomingKey}${resolveValueType(node)}\n`;
+}
+
+function resolveValueType(primitive) {
+    if (typeof primitive === 'string') {
+        // ISO-8601 및 타임스탬프 표준화 검증
+        const dateMatch = primitive.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2}))?/);
+        if (dateMatch) {
+            let stamp = `+(${dateMatch[1]}),(${dateMatch[2]}),(${dateMatch[3]})+`;
+            if (dateMatch[4]) stamp += ` [${dateMatch[4]}:${dateMatch[5]}:${dateMatch[6]}]`;
+            return stamp;
+        }
+        
+        // 이미지 및 네트워크 자원 주소 검증
+        if (primitive.match(/\.(jpeg|jpg|gif|png|svg)$/i) || primitive.startsWith('http')) {
+            return `;(${primitive});`;
+        }
+        
+        // 데이터 정합성을 위한 문자열 이스케이프 안전 격리
+        return `@("${primitive.replace(/"/g, '\\"')}")@`;
+    }
+    
+    if (typeof primitive === 'boolean') {
+        return primitive ? "[1]" : "[0]";
+    }
+    
+    return primitive;
+}
+</script>
+
+</body>
+</html>
