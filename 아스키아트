@@ -1,0 +1,201 @@
+심심해서 스크린샷 비디오를 넣으면 아스키아트로 바꿔주는 삐까번쩍한거 만듬요! 
+코드:<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>초최적화 무채색 아스키 마스터</title>
+    <style>
+        body { 
+            background-color: #080808; 
+            color: #f0f0f0; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            text-align: center; 
+            padding: 20px; 
+            margin: 0;
+        }
+        .container { max-width: 1100px; margin: 0 auto; }
+        h1 { font-weight: 200; letter-spacing: 4px; color: #ffffff; }
+        .control-box { 
+            background: #121212; 
+            padding: 15px 25px; 
+            border-radius: 30px; 
+            margin-bottom: 25px; 
+            border: 1px solid #222; 
+            display: inline-block;
+        }
+        input { 
+            padding: 6px 12px; 
+            background: #1c1c1c; 
+            color: #ffffff; 
+            border: 1px solid #333; 
+            border-radius: 20px; 
+            outline: none;
+            text-align: center;
+        }
+        
+        /* 🔥 화질 깨짐을 물리적으로 치료하는 고인물 최적화 CSS */
+        .screen-wrapper {
+            background: #000000;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.9);
+            display: inline-block;
+            max-width: 100%;
+            overflow: auto;
+        }
+
+        #ascii-screen {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: 900; /* 글자를 두껍게 하여 가독성 확보 */
+            font-size: 4px;   /* 극강의 고화질 숨김 모드 */
+            line-height: 0.50; /* 0.50~0.52 사이가 깨짐 없는 황금 비율 */
+            letter-spacing: -0.9px; /* 자간을 극도로 좁혀 공백 틈새 제거 */
+            white-space: pre;
+            background: #000000;
+            color: #ffffff;
+            text-align: left;
+            margin: 0;
+            
+            /* 🚀 크롬, 사파리 등에서 글자가 뭉개지는 필터링 현상 방지 */
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            text-shadow: none; 
+            -webkit-font-smoothing: none; /* 폰트 안티앨리어싱 강제 해제 */
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>MONOCHROME ASCII PRO</h1>
+    <p>요청하신 다채로운 문자 조합 패턴 및 초고해상도 깨짐 방지 최적화 적용</p>
+    
+    <div class="control-box">
+        <input type="file" id="file-input" accept="image/*,video/*">
+        <label style="color: #888; margin-left: 15px;">정밀도(추천 150~220): </label>
+        <input type="number" id="width-input" value="180" min="50" max="350" style="width: 70px;">
+    </div>
+
+    <br>
+    <div class="screen-wrapper">
+        <pre id="ascii-screen">PNG / MP4 파일을 드롭하거나 선택하세요.</pre>
+    </div>
+
+    <video id="hidden-video" controls loop muted style="display:none;"></video>
+    <canvas id="hidden-canvas" style="display:none;"></canvas>
+</div>
+
+<script>
+    const fileInput = document.getElementById('file-input');
+    const widthInput = document.getElementById('width-input');
+    const asciiScreen = document.getElementById('ascii-screen');
+    const video = document.getElementById('hidden-video');
+    const canvas = document.getElementById('hidden-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // 💡 요청하신 특수문자들을 면적과 모양(질감)에 맞춰 25단계 무채색 셰이더로 재배치!
+    // 꽉 찬 블록 -> 대문자 계열 -> 괄호/기호 -> 선/비교 연산자 -> 점 -> 공백
+    const ASCII_CHARS = [
+        "█", "▓", "▒", "░", 
+        "W", "H", "U", "O", "T", "V", "I", 
+        "{}", "[]", 
+        "==", "+", "<", ">", "-", "_", 
+        ":", ",", ".", " ", " "
+    ];
+    
+    let animationFrameId = null;
+    let currentImgSource = null;
+    let fileType = "";
+
+    fileInput.addEventListener('change', handleFileSelect);
+    widthInput.addEventListener('input', () => {
+        if (fileType === "image" && currentImgSource) {
+            processAscii(currentImgSource, currentImgSource.width, currentImgSource.height);
+        }
+    });
+
+    function handleFileSelect() {
+        const file = this.files[0];
+        if (!file) return;
+
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        video.pause();
+        currentImgSource = null;
+
+        const fileURL = URL.createObjectURL(file);
+
+        if (file.type.startsWith('video/')) {
+            fileType = "video";
+            video.src = fileURL;
+            video.play();
+        } else if (file.type.startsWith('image/')) {
+            fileType = "image";
+            const img = new Image();
+            img.onload = function() {
+                currentImgSource = img;
+                processAscii(img, img.width, img.height);
+            };
+            img.src = fileURL;
+        }
+    }
+
+    video.addEventListener('play', () => {
+        if (fileType === "video") {
+            renderVideoLoop();
+        }
+    });
+
+    function renderVideoLoop() {
+        if (video.paused || video.ended) return;
+        processAscii(video, video.videoWidth, video.videoHeight);
+        animationFrameId = requestAnimationFrame(renderVideoLoop);
+    }
+
+    function processAscii(source, originalWidth, originalHeight) {
+        const targetWidth = parseInt(widthInput.value) || 180;
+        
+        // 폰트 왜곡률 최소화 장치 (0.50으로 줄간격 완벽 믹스)
+        const fontAspectRatio = 0.50; 
+        const scale = targetWidth / originalWidth;
+        const targetHeight = Math.floor(originalHeight * scale * fontAspectRatio);
+
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        
+        // 이미지 변환 퀄리티를 위해 캔버스 스무딩 비활성화 (도트화)
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(source, 0, 0, targetWidth, targetHeight);
+
+        const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+        const pixels = imageData.data;
+        
+        let asciiStr = "";
+
+        for (let y = 0; y < targetHeight; y++) {
+            for (let x = 0; x < targetWidth; x++) {
+                const idx = (y * targetWidth + x) * 4;
+
+                if (pixels[idx + 3] < 128) {
+                    asciiStr += " ";
+                    continue;
+                }
+
+                const r = pixels[idx];
+                const g = pixels[idx + 1];
+                const b = pixels[idx + 2];
+
+                // 무채색 명도 연산
+                const brightness = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+                // 25단계의 정밀한 문자 매핑 수식
+                const charIdx = Math.floor((brightness / 256) * ASCII_CHARS.length);
+                asciiStr += ASCII_CHARS[charIdx];
+            }
+            asciiStr += "\n";
+        }
+
+        asciiScreen.textContent = asciiStr;
+    }
+</script>
+</body>
+</html>
