@@ -5,7 +5,7 @@
 이런게 추가됬고 저장파일은 코드는 나중에 써야하는데 나중에 다시 하기 귀찮을떄 복사해서 여기에 저장함 됩니다(Storage)
 백업파일1 백업파일2는 실행전으로 돌아가거나 실행전전으로 돌아갈수 있는 코드들이 있어 정말 좋스빈다!
 코드:
-<!DOCTYPE html>
+```<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -3023,4 +3023,4 @@ consoleLog('info', loadedFromEmbeddedSave
 })();
 </script>
 </body>
-</html>
+</html>```
